@@ -62,6 +62,7 @@ class User extends EventEmitter {
     })
 
     // observe boundVolume change
+    // for phi
     if (opts.boundVolumeId) {
       this.chassisId = opts.boundVolumeId
       this.chassisStore = new DataStore({
@@ -87,7 +88,8 @@ class User extends EventEmitter {
     })
 
     // start polling cloud users status
-    this.lookupCloudUsers()
+    // for phi
+    if (GLOBAL_CONFIG.type !== 'winas') this.lookupCloudUsers()
   }
 
   chassisUpdate () {
@@ -195,24 +197,29 @@ class User extends EventEmitter {
 
       let cU = users.find(u => u.username === username)
       if (cU && cU.status !== USER_STATUS.DELETED) throw new Error('username already exist')
-      let pU = users.find(u => u.phicommUserId === phicommUserId)
-      if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
       let pnU = users.find(u => u.phoneNumber === phoneNumber)
       if (pnU && pnU.status !== USER_STATUS.DELETED) throw new Error('phoneNumber already exist')
+
+      if (GLOBAL_CONFIG.type === 'phi') {
+        let pU = users.find(u => u.phicommUserId === phicommUserId)
+        if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
+      }
 
       let newUser = {
         uuid,
         username: props.username,
         isFirstUser,
-        phicommUserId: props.phicommUserId,
+        phicommUserId: props.phicommUserId, // for phi
         password: props.password,
         smbPassword: props.smbPassword,
         status: USER_STATUS.ACTIVE,
         createTime: new Date().getTime(),
         lastChangeTime: new Date().getTime(),
-        phoneNumber: props.phoneNumber,
-        itime: new Date().getTime() // inviteTime, serve for check invite timeout
+        phoneNumber: props.phoneNumber 
       }
+
+      if (GLOBAL_CONFIG.type === 'phi') newUser.itime = new Date().getTime() // inviteTime, serve for check invite timeout
+
       return [...users, newUser]
     }, (err, data) => {
       if (err) return callback(err)
@@ -259,15 +266,15 @@ class User extends EventEmitter {
       if (!isUUID(userUUID)) throw new Error(`userUUID ${userUUID} is not a valid uuid`)
       if (!isNonNullObject(props)) throw new Error('props is not a non-null object')
       if (!isNonEmptyString(props.password)) throw new Error('password must be a non-empty string if provided')
-      // if (props.smbPassword !== undefined && !isNonEmptyString(props.smbPassword)) throw new Error('smbPassword must be a non-empty string if provided')
-      // if (!props.password && !props.smbPassword) throw new Error('both password and smbPassword undefined')
       if (props.encrypted !== undefined && typeof props.encrypted !== 'boolean') throw new Error('encrypted must be either true or false')
 
       // TODO props validation should be in router, I guess
     } catch (e) {
       return process.nextTick(() => callback(e))
     }
-    request
+
+    if (GLOBAL_CONFIG.type === 'phi') {
+      request
       .patch('http://127.0.0.1:3001/v1/user/password')
       .set('Accept', 'application/json')
       .send(props)
@@ -286,9 +293,22 @@ class User extends EventEmitter {
           return callback(null, data.find(x => x.uuid === userUUID))
         })
       })
+    } else {
+      this.storeSave(users => {
+        let index = users.findIndex(u => u.uuid === userUUID)
+        if (index === -1) throw new Error('user not found')
+        let nextUser = Object.assign({}, users[index])
+        nextUser.password = props.password // FIXME: winas encrypted
+        return [...users.slice(0, index), nextUser, ...users.slice(index + 1)]
+      }, (err, data) => {
+        if (err) return callback(err)
+        return callback(null, data.find(x => x.uuid === userUUID))
+      })
+    }
   }
 
   bindFirstUser (boundUser) {
+    if (GLOBAL_CONFIG.type !== 'phi') return console.log('bindFirstUser only use for phi')
     this.storeSave(users => {
       let index = users.findIndex(u => u.isFirstUser)
       if (index === -1) {
@@ -356,13 +376,13 @@ class User extends EventEmitter {
       uuid: user.uuid,
       username: user.username,
       isFirstUser: user.isFirstUser,
-      phicommUserId: user.phicommUserId,
+      phicommUserId: user.phicommUserId, // for phi
       password: !!user.password,
       smbPassword: !!user.smbPassword,
       createTime: user.createTime,
       status: user.status,
       phoneNumber: user.phoneNumber,
-      reason: user.reason
+      reason: user.reason // for phi
     }
   }
 
@@ -404,7 +424,7 @@ class User extends EventEmitter {
       if (!recognized.includes(key)) throw Object.assign(new Error(`unrecognized prop name ${key}`), { status: 400 })
     })
     if (!isNonEmptyString(props.username)) return callback(Object.assign(new Error('username must be non-empty string'), { status: 400 }))
-    if (!isNonEmptyString(props.phicommUserId)) return callback(Object.assign(new Error('phicommUserId must be non-empty string'), { status: 400 }))
+    if (props.phicommUserId && !isNonEmptyString(props.phicommUserId)) return callback(Object.assign(new Error('phicommUserId must be non-empty string'), { status: 400 }))
     if (!isNonEmptyString(props.phoneNumber)) return callback(Object.assign(new Error('phoneNumber must be non-empty string'), { status: 400 }))
     if (props.password && !isNonEmptyString(props.password)) return callback(Object.assign(new Error('password must be non-empty string'), { status: 400 }))
     if (this.users.length && (!user || !user.isFirstUser)) return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
@@ -417,7 +437,7 @@ class User extends EventEmitter {
   */
   GET (user, props, callback) {
     let userUUID = props.userUUID
-    let u = isUUID(userUUID) ? this.getUser(props.userUUID) : this.users.find(u => u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
+    let u = isUUID(userUUID) ? this.getUser(props.userUUID) : this.users.find(u => u.phicommUserId && u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
     if (!u) return process.nextTick(() => callback(Object.assign(new Error('user not found'), { status: 404 })))
     if (user.isFirstUser || user.uuid === u.uuid) return process.nextTick(() => callback(null, this.fullInfo(u)))
     return process.nextTick(Object.assign(new Error('Permission Denied'), { status: 403 }))
@@ -464,7 +484,7 @@ class User extends EventEmitter {
   DELETE (user, props, callback) {
     let userUUID
     let devU = isUUID(props.userUUID) ? this.users.find(u => u.uuid === props.userUUID && u.status !== USER_STATUS.DELETED)
-      : this.users.find(u => u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
+      : this.users.find(u => u.phicommUserId && u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
     if (!devU) return callback(Object.assign(new Error('user not found'), { status: 404 }))
     userUUID = devU.uuid
 

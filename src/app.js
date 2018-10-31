@@ -6,12 +6,14 @@ const UUID = require('uuid')
 
 const mkdirp = require('mkdirp')
 const getArgs = require('get-args')
+const config = require('config')
 
 const { passwordEncrypt } = require('./lib/utils')
 const configurations = require('./configurations')
 const Fruitmix = require('./fruitmix/Fruitmix')
 const App = require('./app/App')
 
+global.GLOBAL_CONFIG = config
 
 /**
 This is the entry point of the program.
@@ -34,9 +36,7 @@ CreateApp parses args and create the App accordingly.
 let isRoot = process.getuid && process.getuid() === 0
 let args = (getArgs(process.argv)).options
 
-const hostname = `phi-generic-deadbeef${UUID.v4().split('-').join('').slice(0, 16)}`
-
-console.log(args)
+// console.log(args)
 
 // only standalone && fruitmix-only mode allows non-priviledged user
 if (!(args.standalone && args['fruitmix-only']) && !isRoot)
@@ -47,20 +47,12 @@ if (args.dlna && !isRoot) throw new Error('dlna feature requires root priviledge
 if (args.transmission && !isRoot) throw new Error('transmission feature requires root priviledge')
 
 if (args.mdns && !isRoot) throw new Error('mdns requires root priviledge')
-// if (args.mdns) {
-//   child.exec(`avahi-set-host-name ${hostname}`)
-//   child.spawn('avahi-publish-service', ['Phicomm Boostrap', '_http._tcp', 3000], { stdio: 'ignore' })
-// }
 
 let fruitmixOpts = {
   useSmb: !!args.smb,
   useDlna: !!args.dlna,
   useTransmission: !!args.transmission,
 }
-
-let fruitmixDir = path.join(process.cwd(), 'tmptest')
-
-let appOpts
 
 // in standalone mode
 if (args.standalone) {
@@ -88,8 +80,8 @@ if (args.standalone) {
       useServer: true,
     })
   } else {
-    let configuration = configurations.phicomm.n2
-    console.log('configuration', configuration)
+    let configuration = configurations.wisnuc.winas
+    // console.log('configuration', configuration)
     fruitmixOpts.useSmb = !!args.smb || configuration.smbAutoStart
     fruitmixOpts.useDlna = !!args.dlna || configuration.dlnaAutoStart
     let app = new App({

@@ -39,7 +39,35 @@ const wisnuc = {
   tag: {
     isPrivate: false,
     visibleInPublicDrive: true,
-  }
+  },
+  smbAutoStart: true,
+  dlnaAutoStart: true
+}
+
+/** 
+configuration for winas devices
+@constant {Configuration} 
+*/
+const winas = {
+  chassis: {
+    userBinding: false,
+    volumeBinding: true,
+    dir: '/etc/winas',
+    tmpDir: '/etc/winas/atmp',
+    dTmpDir: '/etc/winas/atmp'
+  },
+  storage: {
+    fruitmixDir: 'winas/fruitmix',
+    volumeDir: '/run/winas/volumes',
+    nonVolumeDir: '/run/winas/blocks',
+    userProps: ['uuid', 'username', 'isFirstUser', 'global' ]
+  },
+  tag: {
+    isPrivate: false,
+    visibleInPublicDrive: true,
+  },
+  smbAutoStart: true,
+  dlnaAutoStart: true
 }
 
 /**
@@ -73,7 +101,8 @@ const n2 = {
 
 module.exports = {
   wisnuc: {
-    default: wisnuc
+    default: wisnuc,
+    winas: winas
   },
   phicomm: {
     n2

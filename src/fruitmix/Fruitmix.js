@@ -56,8 +56,6 @@ Fruitmix has the following structure:
   apis: {
     user,
     drive,
-
-
     tag,
     dir,
     dirEntry,
@@ -77,7 +75,6 @@ For example: user module provides apis. so fruitmix.user and fruitmix.apis.user 
 
 but for directories and files api, it is obviously that the separate api module should be created. Both depends on VFS module.
 
-
 Fruitmix has no knowledge of chassis, storage, etc.
 */
 class Fruitmix extends EventEmitter {
@@ -92,7 +89,6 @@ class Fruitmix extends EventEmitter {
   */
   constructor (opts) {
     super()
-
     this.fruitmixDir = opts.fruitmixDir
     mkdirp.sync(this.fruitmixDir)
 
@@ -106,7 +102,7 @@ class Fruitmix extends EventEmitter {
 
     // setup user module
     this.user = new User({
-      boundVolumeId: this.boundVolume.id,
+      boundVolumeId: this.boundVolume && this.boundVolume.id || undefined,
       file: path.join(this.fruitmixDir, 'users.json'),
       tmpDir: path.join(this.fruitmixDir, 'tmp', 'users'),
       chassisFile: path.join(this.fruitmixDir, 'boundVolumes.json'),

@@ -57,6 +57,9 @@ class State {
   }
 
   continuable () {
+    // for winas
+    if (GLOBAL_CONFIG.type === 'winas') return true
+
     if (!this.ctx.boundUser) return false
     if (this.ctx.volumeStore.data === undefined) return false
     if (this.ctx.preset === undefined) return false
@@ -64,6 +67,9 @@ class State {
   }
 
   next () {
+    // for winas
+    if (GLOBAL_CONFIG.type === 'winas') return this.setState(Starting)
+
     if (this.ctx.bootable()) {
       if (this.ctx.preset && this.ctx.preset.state === 'PENDING') {
         this.setState(Presetting)
@@ -210,15 +216,28 @@ class Presetting extends State {
 
 class Starting extends State {
   enter () {
-    let boundVolumeUUID = this.ctx.volumeStore.data.uuid
-    let volume = this.ctx.storage.volumes.find(v => v.uuid === boundVolumeUUID)
-    let fruitmixDir = path.join(volume.mountpoint, this.ctx.conf.storage.fruitmixDir)
-    let opts = Object.assign({}, this.ctx.fruitmixOpts, {
+    let opts, boundVolumeUUID, volume, fruitmixDir
+    if (GLOBAL_CONFIG.type === 'winas') {
+      if (GLOBAL_CONFIG.storage.root.uuid) {
+        boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
+        volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
+        fruitmixDir = path.join(volume.mountpoint, this.ctx.conf.storage.fruitmixDir)
+      } else { // for test
+        fruitmixDir = path.join(process.cwd(), GLOBAL_CONFIG.storage.root.path)
+      }
+    } else { // for phi
+      boundVolumeUUID = this.ctx.volumeStore.data.uuid
+      volume = this.ctx.storage.volumes.find(v => v.uuid === boundVolumeUUID)
+      fruitmixDir = path.join(volume.mountpoint, this.ctx.conf.storage.fruitmixDir)
+    }
+
+    opts = Object.assign({}, this.ctx.fruitmixOpts, {
       fruitmixDir,
-      boundVolume: this.ctx.volumeStore.data,
+      boundVolume: this.ctx.volumeStore ? this.ctx.volumeStore.data : undefined,
       boundUser: this.ctx.boundUser,
       ejectHandler: this.ctx.ejectUSB.bind(this.ctx)
     })
+    
     let fruitmix = new Fruitmix(opts)
 
     fruitmix.setStorage(this.ctx.storage)
@@ -240,49 +259,44 @@ class Starting extends State {
 class Started extends State {
   enter (fruitmix) {
     this.ctx.fruitmix = fruitmix
-    this.jobs = []
-    let job = {
-      type: 'updateBoundVolume',
-      props: {}
-    }
-    this.jobs.push(job)
-    this.reqSchedJob()
-
     this.udevMonitor = new UdevMonitor()
     this.udevMonitor.on('update', () => this.ctx.storageUpdater.probe())
+    
+    if (GLOBAL_CONFIG.type !== 'winas') {
+      this.jobs = []
+      let job = {
+        type: 'updateBoundVolume',
+        props: {}
+      }
+      this.jobs.push(job)
+      this.reqSchedJob()
+      this.uninstalling = false
 
-    this.uninstalling = false
-
-    // do balance 
-    this.balanceTimer = setInterval(() => {
-      console.log('============== start balance ======')
-      child.exec(`btrfs balance start ${ fruitmix.fruitmixDir }`, err => {
-        console.log('balance error: ', err)
-        console.log('mountpoint: ' + fruitmix.fruitmixDir)
-        console.log('============== end balance ======')
-        if (err) {
-          console.log('========== start duage=0 balance =======')
-          child.exec(`btrfs balance start -dusage=0 ${ fruitmix.fruitmixDir }`, err => {
-            console.log('balance error: ', err)
-            console.log('============== end duage=0 balance ======')
-            if (err) {
-              console.log('========== start muage=0 balance =======')
-              child.exec(`btrfs balance start -musage=0 ${ fruitmix.fruitmixDir }`, err => {
-                console.log('balance error: ', err)
-                console.log('============== end muage=0 balance ======')
-              })
-            }
-          })
-        }
-      })
-    }, 24 * 1000 * 60 * 60)
+      // do balance 
+      this.balanceTimer = setInterval(() => {
+        child.exec(`btrfs balance start ${ fruitmix.fruitmixDir }`, err => {
+          if (err) {
+            child.exec(`btrfs balance start -dusage=0 ${ fruitmix.fruitmixDir }`, err => {
+              console.log('balance error: ', err)
+              if (err) {
+                child.exec(`btrfs balance start -musage=0 ${ fruitmix.fruitmixDir }`, err => {
+                  console.log('balance error: ', err)
+                })
+              }
+            })
+          }
+        })
+      }, 24 * 1000 * 60 * 60)
+    }
   }
 
   exit () {
     this.ctx.fruitmix = null
-    let jobs = [...this.jobs]
-    this.jobs = []
-    jobs.forEach(j => j.callback && j.callback(new Error('exit started state')))
+    if (this.jobs) {
+      let jobs = [...this.jobs]
+      this.jobs = []
+      jobs.forEach(j => j.callback && j.callback(new Error('exit started state')))
+    }
     this.udevMonitor.destroy()
     clearInterval(this.balanceTimer)
   }
@@ -410,6 +424,8 @@ class Started extends State {
     }
   */
   remove (devices, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+
     if (this.uninstalling) return callback(new Error('station in uninstalling'))
     if (!Array.isArray(devices) || devices.length !== 1) {
       return callback(new Error('devices must be an one item array'))
@@ -448,6 +464,7 @@ class Started extends State {
   }
 
   uninstall(props, cb) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => cb(new Error('Error Operation')))
     let callback = (err) => {
       this.uninstalling = false
       console.log(err)
@@ -972,27 +989,29 @@ class Boot extends EventEmitter {
       }
     })
 
-    this.prepareChassisDirs(err => {
-      if (err) {
-        // will halt boot @ pending state after probing
-        this.error = err
-      } else {
-        this.volumeStore = new DataStore(this.storeOpts('volume'))
-        this.volumeStore.on('Update', () => this.state.boundVolumeUpdated())
-
-        // for preset, preserve a copy
-        this.presetStore = new DataStore(this.storeOpts('preset'))
-        this.presetStore.once('Update', data => {
-          if (data) {
-            this.preset = { state: 'PENDING', data }
-            this.presetStore.save(null, () => {})
-          } else {
-            this.preset = null
-          }
-          this.state.presetLoaded()
-        })
-      }
-    })
+    if (GLOBAL_CONFIG.type !== 'winas') {
+      this.prepareChassisDirs(err => {
+        if (err) {
+          // will halt boot @ pending state after probing
+          this.error = err
+        } else {
+          this.volumeStore = new DataStore(this.storeOpts('volume'))
+          this.volumeStore.on('Update', () => this.state.boundVolumeUpdated())
+  
+          // for preset, preserve a copy
+          this.presetStore = new DataStore(this.storeOpts('preset'))
+          this.presetStore.once('Update', data => {
+            if (data) {
+              this.preset = { state: 'PENDING', data }
+              this.presetStore.save(null, () => {})
+            } else {
+              this.preset = null
+            }
+            this.state.presetLoaded()
+          })
+        }
+      })
+    }
 
     new Probing(this)
 
@@ -1001,7 +1020,7 @@ class Boot extends EventEmitter {
   }
 
   storageUpdate (data) {
-    if (this.stateName().toUpperCase() === 'STARTED') {
+    if (this.stateName().toUpperCase() === 'STARTED' && GLOBAL_CONFIG.type !== 'winas') {
       let prvVol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
       let vol = data.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
       if (vol.isMissing) return process.exit(61)
@@ -1103,22 +1122,27 @@ class Boot extends EventEmitter {
   }
 
   init (target, mode, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.init(target, mode, callback)
   }
 
   import (volumeUUID, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.import(volumeUUID, callback)
   }
 
   repair (devices, mode, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.repair(devices, mode, callback)
   }
 
   add (devices, mode, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.add(devices, mode, callback)
   }
 
   remove (devices, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.remove(devices, callback)
   }
 
@@ -1132,6 +1156,7 @@ class Boot extends EventEmitter {
    * @param {*} callback 
    */
   uninstall (user, props,callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
     // FIXME:
     // if (!user || !user.phicommUserId || user.phicommUserId !== this.boundUser.phicommUserId) {
     //   return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
@@ -1161,6 +1186,8 @@ class Boot extends EventEmitter {
   }
 
   resetToFactory(user, autoReboot, callback) {
+    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+
     let fileP = '/mnt/reserved/fw_ver_release.json'
     fs.readFile(fileP, (err, data) => {
       if (err) return callback(err)

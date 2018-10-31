@@ -61,7 +61,7 @@ const probeProcAsync = async (path, multi) => {
 }
 
 const deviceModel = () => {
-  return 'PhiNAS2'
+  return 'winas'
 }
 
 const softwareVersion = () => {
@@ -69,12 +69,12 @@ const softwareVersion = () => {
 }
 
 const hardwareVersion = () => {
-  return '1.0.0'
+  return '0.0.1'
 }
 
 let releases, swVer
 try {
-  releases = JSON.parse(fs.readFileSync('/mnt/reserved/fw_ver_release.json').toString())
+  // releases = JSON.parse(fs.readFileSync('/mnt/reserved/fw_ver_release.json').toString())
   swVer = fs.readFileSync('/etc/version').toString().trim()
 } catch(e) {
   console.log('==========================')

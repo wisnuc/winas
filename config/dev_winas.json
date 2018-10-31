@@ -1,0 +1,14 @@
+{
+  "type": "winas",
+  "storage": {
+    "root": {
+      "path": "./tmptest"
+    }
+  },
+  "user": {
+
+  },
+  "drive": {
+
+  }
+}

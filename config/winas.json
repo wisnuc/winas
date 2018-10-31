@@ -1,0 +1,15 @@
+{
+  "type": "winas",
+  "storage": {
+    "root": {
+      "uuid": "82db3f5a-d531-4bc9-8854-9431edbdd0b5",
+      "path": "/mnt/data"
+    }
+  },
+  "user": {
+
+  },
+  "drive": {
+
+  }
+}

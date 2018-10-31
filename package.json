@@ -33,6 +33,7 @@
     "bluebird": "^3.5.0",
     "body-parser": "1.17.2",
     "canonical-json": "0.0.4",
+    "config": "^2.0.1",
     "cookie-parser": "~1.4.3",
     "crypt3": "^1.0.0",
     "cuint": "^0.2.2",

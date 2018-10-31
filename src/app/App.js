@@ -96,7 +96,7 @@ class App extends EventEmitter {
       let fruitmixOpts = opts.fruitmixOpts
       fruitmixOpts.cloudConf = this.cloudConf
 
-      try {
+      try { // for phi
         let slots
         if (fs.existsSync(SlotConfPath)) {
           slots = JSON.parse(fs.readFileSync(SlotConfPath).toString().trim())
@@ -104,7 +104,6 @@ class App extends EventEmitter {
         if (Array.isArray(slots)) {
           configuration.slots = slots
         }
-        console.log('update slots: ', configuration.slots)
       } catch(e) {}
 
       this.device = new Device(this)
