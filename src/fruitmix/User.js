@@ -298,7 +298,7 @@ class User extends EventEmitter {
         let index = users.findIndex(u => u.uuid === userUUID)
         if (index === -1) throw new Error('user not found')
         let nextUser = Object.assign({}, users[index])
-        nextUser.password = props.password // FIXME: winas encrypted
+        nextUser.password = props.encrypted ? props.password : passwordEncrypt(props.password, 10)
         return [...users.slice(0, index), nextUser, ...users.slice(index + 1)]
       }, (err, data) => {
         if (err) return callback(err)
@@ -419,7 +419,12 @@ class User extends EventEmitter {
   */
   POST (user, props, callback) {
     if (!isNonNullObject(props)) return callback(Object.assign(new Error('props must be non-null object'), { status: 400 }))
-    let recognized = ['username', 'phicommUserId', 'phoneNumber']
+    let recognized
+    if (GLOBAL_CONFIG.type === 'phi') {
+      recognized = ['username', 'phicommUserId', 'phoneNumber']
+    } else {
+      recognized = ['username', 'password', 'phoneNumber']
+    }
     Object.getOwnPropertyNames(props).forEach(key => {
       if (!recognized.includes(key)) throw Object.assign(new Error(`unrecognized prop name ${key}`), { status: 400 })
     })
@@ -428,7 +433,9 @@ class User extends EventEmitter {
     if (!isNonEmptyString(props.phoneNumber)) return callback(Object.assign(new Error('phoneNumber must be non-empty string'), { status: 400 }))
     if (props.password && !isNonEmptyString(props.password)) return callback(Object.assign(new Error('password must be non-empty string'), { status: 400 }))
     if (this.users.length && (!user || !user.isFirstUser)) return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
-
+    if (props.password) {
+      props.password = passwordEncrypt(props.password, 10)
+    }
     this.createUser(props, (err, user) => err ? callback(err) : callback(null, this.fullInfo(user)))
   }
 
