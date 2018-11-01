@@ -1098,7 +1098,7 @@ class Boot extends EventEmitter {
 
     let storage
 
-    if (this.storage) {
+    if (this.storage && GLOBAL_CONFIG.type === 'phi') {
       let portsPaths= this.storage.ports
         .map(p => p.path.split('/ata_port').length ? p.path.split('/ata_port')[0] : undefined)
         .filter(x => !!x && x.length)
@@ -1110,12 +1110,13 @@ class Boot extends EventEmitter {
       storage = JSON.parse(JSON.stringify(this.storage))
 
       slots.forEach((value, index) => value ? (storage.blocks.forEach(b => b.path.startsWith(value) ? b.slotNumber = index + 1 : b)) : value)
-    }
+    } else
+      storage = this.storage
 
     return {
       state: this.state.constructor.name.toUpperCase(),
       boundUser: this.boundUser ? { phicommUserId: this.boundUser.phicommUserId } : this.boundUser,
-      boundVolume: this.volumeStore.data,
+      boundVolume: this.volumeStore && this.volumeStore.data,
       storage: storage,
       preset: this.preset
     }

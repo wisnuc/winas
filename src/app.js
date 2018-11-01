@@ -95,7 +95,7 @@ if (args.standalone) {
 }
 
 // print freemem per 60s
-setInterval(() => console.log('process info:', Object.assign({
-  uptime: process.uptime(),
-  freemem: os.freemem()
-}, process.memoryUsage())), 60 * 1000)
+// setInterval(() => console.log('process info:', Object.assign({
+//   uptime: process.uptime(),
+//   freemem: os.freemem()
+// }, process.memoryUsage())), 60 * 1000)
