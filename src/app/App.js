@@ -6,24 +6,14 @@ const fs = require('fs')
 const Boot = require('../system/Boot')
 const Auth = require('../middleware/Auth')
 const createTokenRouter = require('../routes/Token')
-// const createUserRouter = require('../routes/users')
-// const createDriveRouter = require('../routes/drives2')
-// const createTimeDateRouter = require('../routes/TimeDate')
 const createExpress = require('../system/express')
-// const createTagRouter = require('../routes/tags')
-// const createTaskRouter = require('../routes/tasks2')
-// const createSambaRouter = require('../routes/samba')
-// const createTransmissionRouter = require('../routes/transmission')
-
 const express = require('express') // TODO
+
 const { passwordEncrypt } = require('../lib/utils')
-
 const routing = require('./routing')
-
 const Pipe = require('./Pipe')
-
+const Transform = require('./Transform')
 const Device = require('../fruitmix/Device')
-
 const SlotConfPath = '/phi/slots'
 /**
 Create An Application
@@ -125,13 +115,15 @@ class App extends EventEmitter {
     // create express instance
     this.createExpress()
 
-    // create a Pipe
-    this.pipe = new Pipe({
+    const pipOpts = {
       fruitmix: () => this.fruitmix,
       config: this.cloudConf,
       boot: this.boot,
       device: this.device
-    })
+    }
+
+    // create a Pipe
+    this.pipe = GLOBAL_CONFIG.type === 'winas' ? new new Pipe(pipOpts) : new Transform(pipOpts)
 
     // create server if required
     if (opts.useServer) {
@@ -149,7 +141,30 @@ class App extends EventEmitter {
       })
     }
     if (opts.listenProcess)
-      process.on('message', this.handleMessage.bind(this))
+      process.on('message', GLOBAL_CONFIG.type === 'winas' ?
+        this.handleWinasMessage.bind(this)
+        : this.handleMessage.bind(this))
+  }
+
+  handleWinasMessage (msg) {
+    let message
+    try {
+      message = JSON.parse(msg)
+    } catch (e) {
+      console.log('Bootstrap Message -> JSON parse Error')
+      console.log(msg)
+      return
+    } 
+    switch (message.type) {
+      case 'pipe' : 
+        this.pipe.handleMessage(message.data)
+        break
+      case 'token':
+        this.cloudConf.cloudToken = message.data
+        break
+      default:
+        break
+    }
   }
 
   handleMessage (msg) {
@@ -162,10 +177,8 @@ class App extends EventEmitter {
       return
     } 
     switch (message.type) {
-      case 'pip':
+      case 'pip' :
         this.pipe.handleMessage(message)
-        break
-      case 'hello':
         break
       case 'bootstrap_token' :
         this.cloudConf.cloudToken = message.data.token

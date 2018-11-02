@@ -193,7 +193,7 @@ class User extends EventEmitter {
     let uuid = UUID.v4()
     this.storeSave(users => {
       let isFirstUser = users.length === 0
-      let { username, phicommUserId, password, smbPassword, phoneNumber } = props // eslint-disable-line
+      let { username, phicommUserId, winasUserId, password, smbPassword, phoneNumber } = props // eslint-disable-line
 
       let cU = users.find(u => u.username === username)
       if (cU && cU.status !== USER_STATUS.DELETED) throw new Error('username already exist')
@@ -202,6 +202,11 @@ class User extends EventEmitter {
 
       if (GLOBAL_CONFIG.type === 'phi') {
         let pU = users.find(u => u.phicommUserId === phicommUserId)
+        if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
+      }
+
+      if (GLOBAL_CONFIG.type === 'winas') {
+        let pU = users.find(u => u.winasUserId === winasUserId)
         if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
       }
 
@@ -215,7 +220,8 @@ class User extends EventEmitter {
         status: USER_STATUS.ACTIVE,
         createTime: new Date().getTime(),
         lastChangeTime: new Date().getTime(),
-        phoneNumber: props.phoneNumber 
+        phoneNumber: props.phoneNumber,
+        winasUserId: props.winasUserId // for winas
       }
 
       if (GLOBAL_CONFIG.type === 'phi') newUser.itime = new Date().getTime() // inviteTime, serve for check invite timeout
@@ -367,7 +373,8 @@ class User extends EventEmitter {
       username: user.username,
       isFirstUser: user.isFirstUser,
       phicommUserId: user.phicommUserId,
-      phoneNumber: user.phoneNumber
+      phoneNumber: user.phoneNumber,
+      winasUserId: user.winasUserId
     }
   }
 
@@ -382,7 +389,8 @@ class User extends EventEmitter {
       createTime: user.createTime,
       status: user.status,
       phoneNumber: user.phoneNumber,
-      reason: user.reason // for phi
+      reason: user.reason, // for phi
+      winasUserId: user.winasUserId
     }
   }
 
@@ -423,7 +431,7 @@ class User extends EventEmitter {
     if (GLOBAL_CONFIG.type === 'phi') {
       recognized = ['username', 'phicommUserId', 'phoneNumber']
     } else {
-      recognized = ['username', 'password', 'phoneNumber']
+      recognized = ['username', 'password', 'phoneNumber', 'winasUserId']
     }
     Object.getOwnPropertyNames(props).forEach(key => {
       if (!recognized.includes(key)) throw Object.assign(new Error(`unrecognized prop name ${key}`), { status: 400 })

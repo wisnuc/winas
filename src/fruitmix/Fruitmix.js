@@ -252,6 +252,19 @@ class Fruitmix extends EventEmitter {
     }
   }
 
+  getUserByWinasUserId (winasUserId) {
+    for (const u of this.users) {
+      if (winasUserId === u.winasUserId && u.status === 'ACTIVE') {
+        return {
+          uuid: u.uuid,
+          username: u.username,
+          isFirstUser: u.isFirstUser,
+          winasUserId: u.winasUserId
+        }
+      }
+    }
+  }
+
   /**
   */
   getUsers () {

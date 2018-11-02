@@ -167,7 +167,7 @@ class Auth {
       forRemote: false,
       token: jwt.encode({
         uuid: user.uuid,
-        phicommUserId: user.phicommUserId
+        winasUserId: user.winasUserId
       }, this.secret)
     }
   }
@@ -184,7 +184,7 @@ class Auth {
       forRemote: true,
       token: jwt.encode({
         uuid: user.uuid,
-        phicommUserId: user.phicommUserId,
+        winasUserId: user.winasUserId,
         timestamp: new Date().getTime()
       }, this.secret)
     }
