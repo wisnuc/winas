@@ -168,6 +168,9 @@ class App extends EventEmitter {
       case 'token':
         this.cloudConf.cloudToken = message.data
         break
+      case 'boundUser':
+        this.boot.setBoundUser(message.data)
+        break
       case 'cloudUsers':
       default:
         break

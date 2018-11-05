@@ -287,6 +287,8 @@ class Started extends State {
           }
         })
       }, 24 * 1000 * 60 * 60)
+    } else {
+      if (this.ctx.boundUser) fruitmix.bindFirstUser(this.ctx.boundUser)
     }
   }
 
@@ -1085,13 +1087,20 @@ class Boot extends EventEmitter {
   }
 
   setBoundUser (user) {
-    if (user && this.boundUser && this.boundUser.phicommUserId !== user.phicommUserId) {
-      console.log('====== boundUser runtime change =====')
-      console.log('====== fruitmix exit =====')
-      process.exit(61)
+    if (GLOBAL_CONFIG.type === 'phi') {
+      if (user && this.boundUser && this.boundUser.phicommUserId !== user.phicommUserId) {
+        console.log('====== boundUser runtime change =====')
+        console.log('====== fruitmix exit =====')
+        process.exit(61)
+      }
+      this.boundUser = user
+      this.state.boundUserUpdated()
     }
-    this.boundUser = user
-    this.state.boundUserUpdated()
+    else {
+      this.boundUser = user
+      if (this.state.constructor.name !== 'Started') return
+      this.fruitmix.bindFirstUser(user)
+    }
   }
 
   view () {

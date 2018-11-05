@@ -320,17 +320,16 @@ class User extends EventEmitter {
       if (index === -1) {
         return [{
           uuid: UUID.v4(),
-          username: boundUser.name || 'admin',
+          username: boundUser.name || boundUser.username || 'admin',
           isFirstUser: true,
           phicommUserId: boundUser.phicommUserId,
           password: boundUser.password,
           smbPassword: '',
-          status: USER_STATUS.ACTIVE
+          status: USER_STATUS.ACTIVE,
+          winasUserId: boundUser.id
         }]
       } else {
         let firstUser = Object.assign({}, users[index])
-        // maybe undefined
-        firstUser.password = boundUser.password
         if (firstUser.phicommUserId !== boundUser.phicommUserId) {
           console.log('===================')
           console.log('This is not an error, but fruitmix received a bound user')
@@ -338,17 +337,23 @@ class User extends EventEmitter {
           console.log('===================')
           process.exit(67)
         }
-        if (isNonEmptyString(boundUser.phoneNumber) && firstUser.phoneNumber !== boundUser.phoneNumber) {
-          if (users.find(u => u.phoneNumber === boundUser.phoneNumber && u.status !== USER_STATUS.DELETED)) {
-            console.log('==============')
-            console.log('update bound user phoneNumber already exist')
-            console.log('update failed')
-            console.log('==============')
-          } else {
-            console.log('==============')
-            console.log('update bound user phoneNumber')
-            console.log('==============')
-            firstUser.phoneNumber = boundUser.phoneNumber
+        if (GLOBAL_CONFIG.type === 'winas') {
+          //TODO: refresh what?
+        } else {
+          // maybe undefined
+          firstUser.password = boundUser.password
+          if (isNonEmptyString(boundUser.phoneNumber) && firstUser.phoneNumber !== boundUser.phoneNumber) {
+            if (users.find(u => u.phoneNumber === boundUser.phoneNumber && u.status !== USER_STATUS.DELETED)) {
+              console.log('==============')
+              console.log('update bound user phoneNumber already exist')
+              console.log('update failed')
+              console.log('==============')
+            } else {
+              console.log('==============')
+              console.log('update bound user phoneNumber')
+              console.log('==============')
+              firstUser.phoneNumber = boundUser.phoneNumber
+            }
           }
         }
         return [
