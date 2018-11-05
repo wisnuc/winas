@@ -212,7 +212,7 @@ class Fruitmix extends EventEmitter {
       process.send && process.send(JSON.stringify({
         type: 'appifi_users',
         users: this.users
-          .filter(x => !x.isFirstUser && x.status === 'ACTIVE')
+          .filter(x => x.status === 'ACTIVE')
           .map(u => { return { uuid: u.uuid, winasUserId: u.winasUserId }})
       }))
       this.emit('FruitmixStarted')
