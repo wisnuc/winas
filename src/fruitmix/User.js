@@ -330,16 +330,23 @@ class User extends EventEmitter {
         }]
       } else {
         let firstUser = Object.assign({}, users[index])
-        if (firstUser.phicommUserId !== boundUser.phicommUserId) {
-          console.log('===================')
-          console.log('This is not an error, but fruitmix received a bound user')
-          console.log('different than the previous one, exit')
-          console.log('===================')
-          process.exit(67)
-        }
         if (GLOBAL_CONFIG.type === 'winas') {
+          if (firstUser.winasUserId !== boundUser.winasUserId) {
+            console.log('===================')
+            console.log('This is not an error, but fruitmix received a bound user')
+            console.log('different than the previous one, exit')
+            console.log('===================')
+            process.exit(67)
+          }
           //TODO: refresh what?
         } else {
+          if (firstUser.phicommUserId !== boundUser.phicommUserId) {
+            console.log('===================')
+            console.log('This is not an error, but fruitmix received a bound user')
+            console.log('different than the previous one, exit')
+            console.log('===================')
+            process.exit(67)
+          }
           // maybe undefined
           firstUser.password = boundUser.password
           if (isNonEmptyString(boundUser.phoneNumber) && firstUser.phoneNumber !== boundUser.phoneNumber) {
