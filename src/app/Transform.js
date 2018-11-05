@@ -125,13 +125,13 @@ class Pipe extends EventEmitter {
       throw formatError(new Error(`message have no msgId`), 400)
     }
     if (!message.user || !message.user.id) {
-      throw formatError(new Error(`this msgId: ${msgId}, message have no user`), 400)
+      throw formatError(new Error(`this msgId: message have no user`), 400)
     }
     if (!message.verb) {
-      throw formatError(new Error(`this msgId: ${msgId}, data have no verb`), 400)
+      throw formatError(new Error(`this msgId: data have no verb`), 400)
     }
     if (!message.urlPath) {
-      throw formatError(new Error(`this msgId: ${msgId}, data have no urlPath`), 400)
+      throw formatError(new Error(`this msgId: data have no urlPath`), 400)
     }
   }
   /**
