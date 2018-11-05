@@ -213,7 +213,7 @@ class Fruitmix extends EventEmitter {
         type: 'appifi_users',
         users: this.users
           .filter(x => !x.isFirstUser && x.status === 'ACTIVE')
-          .map(u => { return { uid: u.phicommUserId, createTime: u.createTime }})
+          .map(u => { return { uuid: u.uuid, winasUserId: u.winasUserId }})
       }))
       this.emit('FruitmixStarted')
     })
