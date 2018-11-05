@@ -314,7 +314,7 @@ class User extends EventEmitter {
   }
 
   bindFirstUser (boundUser) {
-    if (GLOBAL_CONFIG.type !== 'phi') return console.log('bindFirstUser only use for phi')
+    // if (GLOBAL_CONFIG.type !== 'phi') return console.log('bindFirstUser only use for phi')
     this.storeSave(users => {
       let index = users.findIndex(u => u.isFirstUser)
       if (index === -1) {
