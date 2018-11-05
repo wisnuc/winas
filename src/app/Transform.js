@@ -143,7 +143,7 @@ class Pipe extends EventEmitter {
       this.checkMessage(message)
       const user = this.checkUser(message.user.id)
       // reponse to cloud
-      const { urlPath, verb, body, params } = message.data
+      const { urlPath, verb, body, params } = message
       const paths = urlPath.split('/') // ['', 'drives', '123', 'dirs', '456']
       const resource = WHITE_LIST[paths[1]]
       if (!resource) {
@@ -222,7 +222,6 @@ class Pipe extends EventEmitter {
       const opts = { user, matchRoute, method, query, body, params }
       this.apis(message, opts)
     } catch (err) {
-      debug(`pipe message error: `, err)
       this.reqCommand(message, err)
     }
   }
@@ -274,7 +273,6 @@ class Pipe extends EventEmitter {
    * @memberof Pipe
    */
   reqCommand (message, error, res) {
-    debug(`msgId: ${message.sessionId}`, error, res)
     let resErr
     if (error) {
       error = formatError(error)
