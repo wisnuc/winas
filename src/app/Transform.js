@@ -8,7 +8,7 @@ const debug = require('debug')('ws:transform')
 
 const routing = require('./routing')
 
-const getURL = (stationId, jobId, isJson) => `https://abel.nodetribe.com/s/v1/station/${stationId}/response/${jobId}` + isJson ? '/json': ''
+const getURL = (stationId, jobId, isJson) => `https://abel.nodetribe.com/s/v1/station/${stationId}/response/${jobId}${isJson ? '/json': ''}`
 
 const RE_BOUNDARY = /^multipart\/.+?(?:; boundary=(?:(?:"(.+)")|(?:([^\s]+))))$/i
 const routes = []
@@ -222,6 +222,7 @@ class Pipe extends EventEmitter {
       const opts = { user, matchRoute, method, query, body, params }
       this.apis(message, opts)
     } catch (err) {
+      debug('Transform Error: ', err)
       this.reqCommand(message, err)
     }
   }
