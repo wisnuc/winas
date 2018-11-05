@@ -129,7 +129,7 @@ class App extends EventEmitter {
     }
 
     // create a Pipe
-    this.pipe = GLOBAL_CONFIG.type === 'winas' ? new new Pipe(pipOpts) : new Transform(pipOpts)
+    this.pipe = GLOBAL_CONFIG.type === 'winas' ? new Pipe(pipOpts) : new Transform(pipOpts)
 
     // create server if required
     if (opts.useServer) {
