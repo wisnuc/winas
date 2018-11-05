@@ -3,6 +3,9 @@
   "storage": {
     "root": {
       "path": "./tmptest"
+    },
+    "files": {
+      "sn": "/mnt/persistent/certificate/deviceSN"
     }
   },
   "user": {

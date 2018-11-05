@@ -8,6 +8,7 @@ const Auth = require('../middleware/Auth')
 const createTokenRouter = require('../routes/Token')
 const createExpress = require('../system/express')
 const express = require('express') // TODO
+const Config = require('config')
 
 const { passwordEncrypt } = require('../lib/utils')
 const routing = require('./routing')
@@ -65,6 +66,10 @@ class App extends EventEmitter {
 
     // create express
     this.secret = opts.secret || 'Lord, we need a secret'
+    //FIXME: where is deviceSN
+    try {
+      this.deviceSN = fs.readFileSync(Config.storage.files.sn).toString().trim()
+    } catch(e) {}
 
     /**
      * {
@@ -119,7 +124,8 @@ class App extends EventEmitter {
       fruitmix: () => this.fruitmix,
       config: this.cloudConf,
       boot: this.boot,
-      device: this.device
+      device: this.device,
+      deviceSN: this.deviceSN
     }
 
     // create a Pipe
@@ -156,12 +162,13 @@ class App extends EventEmitter {
       return
     } 
     switch (message.type) {
-      case 'pipe' : 
+      case 'pipe':
         this.pipe.handleMessage(message.data)
         break
       case 'token':
         this.cloudConf.cloudToken = message.data
         break
+      case 'cloudUsers':
       default:
         break
     }

@@ -4,16 +4,13 @@ const _ = require('lodash')
 const request = require('request')
 const path = require('path')
 const fs = require('fs')
-const debug = require('debug')('pipe')
+const debug = require('debug')('ws:transform')
 
 const routing = require('./routing')
 
-const BASE_URL = process.argv.includes('--devCloud')
-  ? 'http://sohon2dev.phicomm.com/ResourceManager/nas/callback/'
-  : 'http://sohon2test.phicomm.com/ResourceManager/nas/callback/'
-const RE_BOUNDARY = /^multipart\/.+?(?:; boundary=(?:(?:"(.+)")|(?:([^\s]+))))$/i
-debug('base url', BASE_URL)
+const getURL = (stationId, jobId, isJson) => `https://abel.nodetribe.com/station/${stationId}/response/${jobId}` + isJson ? '/json': ''
 
+const RE_BOUNDARY = /^multipart\/.+?(?:; boundary=(?:(?:"(.+)")|(?:([^\s]+))))$/i
 const routes = []
 // routing map
 // [{
@@ -122,43 +119,18 @@ class Pipe extends EventEmitter {
    * @param {object} message
    */
   checkMessage (message) {
-    // {
-    //   type: 'pip',
-    //   msgId: 'xxxx',
-    //   packageParams: {
-    //     sendingServer: '127.0.0.1',
-    //     waitingServer: '127.0.0.1',
-    //     uid: 123456789
-    //   },
-    //   data: {
-    //     verb: 'GET',
-    //     urlPath: '/token',
-    //     body: {},
-    //     params: {}
-    //   }
-    // }
     if (!message) throw formatError(new Error('pipe have no message'), 400)
 
-    const { msgId, packageParams, data } = message
-    if (!msgId) {
+    if (!message.sessionId) {
       throw formatError(new Error(`message have no msgId`), 400)
     }
-    if (!packageParams) {
-      throw formatError(new Error(`this msgId: ${msgId}, message have no packageParams`), 400)
+    if (!message.user || !message.user.id) {
+      throw formatError(new Error(`this msgId: ${msgId}, message have no user`), 400)
     }
-    if (!packageParams.waitingServer) {
-      throw formatError(new Error(`this msgId: ${msgId}, packageParams have no waitingServer`), 400)
-    }
-    if (!packageParams.uid) {
-      throw formatError(new Error(`this msgId: ${msgId}, packageParams have no uid`), 400)
-    }
-    if (!data) {
-      throw formatError(new Error(`this msgId: ${msgId}, message have no data`), 400)
-    }
-    if (!data.verb) {
+    if (!message.verb) {
       throw formatError(new Error(`this msgId: ${msgId}, data have no verb`), 400)
     }
-    if (!data.urlPath) {
+    if (!message.urlPath) {
       throw formatError(new Error(`this msgId: ${msgId}, data have no urlPath`), 400)
     }
   }
@@ -169,7 +141,7 @@ class Pipe extends EventEmitter {
   handleMessage (message) {
     try {
       this.checkMessage(message)
-      const user = this.checkUser(message.packageParams.uid)
+      const user = this.checkUser(message.user.id)
       // reponse to cloud
       const { urlPath, verb, body, params } = message.data
       const paths = urlPath.split('/') // ['', 'drives', '123', 'dirs', '456']
@@ -301,8 +273,8 @@ class Pipe extends EventEmitter {
    * @param {object} res
    * @memberof Pipe
    */
-  reqCommand (message, error, res, flag) {
-    debug(`msgId: ${message.msgId}`, error, res)
+  reqCommand (message, error, res) {
+    debug(`msgId: ${message.sessionId}`, error, res)
     let resErr
     if (error) {
       error = formatError(error)
@@ -311,43 +283,32 @@ class Pipe extends EventEmitter {
         status: error.status
       }
     }
-    let count = 0
-    const req = () => {
-      if (++count > 2) return
-      return request({
-        uri: `${BASE_URL}${message.packageParams.waitingServer}/command`,
-        method: 'POST',
-        headers: { Authorization: this.ctx.config.cloudToken },
-        body: true,
-        json: {
-          common: {
-            deviceSN: this.ctx.config.device.deviceSN,
-            msgId: message.msgId,
-            flag: !!flag
-          },
-          data: {
-            err: resErr,
-            res: res
-          }
-        }
-      }, (error, response, body) => {
-        if (!error && response.statusCode === 200) {
-          debug(`reqCommand body: ${body}`)
-        }
-      })
-    }
-    return req()
+    return request({
+      uri: getURL(this.ctx.deviceSN, message.sessionId, true),
+      method: 'POST',
+      headers: { Authorization: this.ctx.config.cloudToken },
+      body: true,
+      json: {
+        error : resErr,
+        data: res
+      }
+    }, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        debug(`reqCommand body: ${body}`)
+      }
+    })
   }
   /**
-   * post resource
+   * post resource (fetch)
    * @param {string} absolutePath
    * @memberof Pipe
    */
   postResource (message, absolutePath) {
-    let body = message.data.params
+
+    let headers = message.headers
     let start, end
-    if (body && body.header && body.header.range) {
-      const rangeArr = body.header.range.split('-').filter(x => !!x)
+    if (headers && headers['Range']) {
+      const rangeArr = headers['Range'].slice(5).split('-').filter(x => !!x)
       if (rangeArr.length === 1) {
         start = parseInt(rangeArr[0])
       }
@@ -358,14 +319,10 @@ class Pipe extends EventEmitter {
       console.log('required range stream: ', start, '  ', end)
     }
     request.post({
-      url: `${BASE_URL}${message.packageParams.waitingServer}/resource`,
+      url: getURL(this.ctx.deviceSN, message.sessionId, false),
       headers: {
         Authorization: this.ctx.config.cloudToken,
         'content-type': 'application/octet-stream'
-      },
-      qs: {
-        deviceSN: this.ctx.config.device.deviceSN,
-        msgId: message.msgId
       },
       body: fs.createReadStream(absolutePath, { start, end })
     }, (error, response, body) => {
@@ -380,14 +337,9 @@ class Pipe extends EventEmitter {
    */
   getResource (message) {
     return request({
-      uri: `${BASE_URL}${message.packageParams.waitingServer}/resource`,
+      uri: getURL(this.ctx.deviceSN, message.sessionId, false),
       method: 'GET',
-      headers: { Authorization: this.ctx.config.cloudToken },
-      qs: {
-        deviceSN: this.ctx.config.device.deviceSN,
-        msgId: message.msgId,
-        uid: message.packageParams.uid
-      }
+      headers: { Authorization: this.ctx.config.cloudToken }
     })
   }
 }
