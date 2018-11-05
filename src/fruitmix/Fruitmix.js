@@ -274,7 +274,8 @@ class Fruitmix extends EventEmitter {
       isFirstUser: u.isFirstUser,
       phicommUserId: u.phicommUserId,
       password: !!u.password,
-      smbPassword: !!u.smbPassword
+      smbPassword: !!u.smbPassword,
+      winasUserId: u.winasUserId
     }))
   }
 
@@ -286,7 +287,8 @@ class Fruitmix extends EventEmitter {
       uuid: u.uuid,
       username: u.username,
       isFirstUser: u.isFirstUser,
-      phicommUserId: u.phicommUserId
+      phicommUserId: u.phicommUserId,
+      winasUserId: u.winasUserId
     }))
   }
 
