@@ -282,9 +282,9 @@ class Pipe extends EventEmitter {
     }
 
     let uri = getURL(this.ctx.deviceSN, message.sessionId, false)
-    if (isFetch) uri + '/fetch'
-    else if (isStore) uri + '/store'
-    else uri + '/json'
+    if (isFetch) uri += '/fetch'
+    else if (isStore) uri += '/store'
+    else uri += '/json'
     return request({
       uri: uri,
       method: 'POST',
