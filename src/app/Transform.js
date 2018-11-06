@@ -282,8 +282,8 @@ class Pipe extends EventEmitter {
     }
 
     let uri = getURL(this.ctx.deviceSN, message.sessionId, false)
-    if (isFetch) uri += '/fetch'
-    else if (isStore) uri += '/store'
+    if (isFetch) uri += '/pipe/fetch'
+    else if (isStore) uri += '/pipe/store'
     else uri += '/json'
     debug(uri)
     return request({
@@ -297,7 +297,7 @@ class Pipe extends EventEmitter {
       }
     }, (error, response, body) => {
       if (error) return debug('reqCommand error: ', error)
-      debug('reqCommand success')
+      debug('reqCommand success:', body.status)
     })
   }
   /**
