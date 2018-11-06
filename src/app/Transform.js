@@ -8,7 +8,7 @@ const debug = require('debug')('ws:transform')
 
 const routing = require('./routing')
 
-const getURL = (stationId, jobId, isJson) => `https://abel.nodetribe.com/s/v1/station/${stationId}/response/${jobId}${isJson ? '/json': ''}`
+const getURL = (stationId, jobId) => `https://abel.nodetribe.com/s/v1/station/${stationId}/response/${jobId}`
 
 const RE_BOUNDARY = /^multipart\/.+?(?:; boundary=(?:(?:"(.+)")|(?:([^\s]+))))$/i
 const routes = []
@@ -237,27 +237,25 @@ class Pipe extends EventEmitter {
     const props = Object.assign({}, query, body, params)
     // postform
     if (matchRoute.verb === 'POSTFORM') {
-      // get resource from cloud
+      // Fetch
       this.getResource(message).on('response', response => {
         try {
           props.length = response.headers['content-length']
           const m = RE_BOUNDARY.exec(response.headers['content-type'])
           props.boundary = m[1] || m[2]
           props.formdata = response
-          // console.log('response body: ', body)
-          // console.log('response headers: ', response.headers)
         } catch (err) {
-          return this.reqCommand(message, err, true)
+          return this.reqCommand(message, err, undefined, false, true)
         }
         // { driveUUID, dirUUID, boundary, length, formdata }
         this.ctx.fruitmix().apis[matchRoute.api][method](user, props, (err, data) => {
-          this.reqCommand(message, err, data, true)
+          this.reqCommand(message, err, data, false, true)
         })
       })
     } else {
       return this.ctx.fruitmix().apis[matchRoute.api][method](user, props, (err, data) => {
         if (err) return this.reqCommand(message, err)
-        // stream
+        // Store
         if (typeof data === 'string' && path.isAbsolute(data)) {
           this.postResource(message, data)
         } else {
@@ -273,7 +271,7 @@ class Pipe extends EventEmitter {
    * @param {object} res
    * @memberof Pipe
    */
-  reqCommand (message, error, res) {
+  reqCommand (message, error, res, isFetch, isStore) {
     let resErr
     if (error) {
       error = formatError(error)
@@ -282,8 +280,13 @@ class Pipe extends EventEmitter {
         status: error.status
       }
     }
+
+    let uri = getURL(this.ctx.deviceSN, message.sessionId, false)
+    if (isFetch) uri + '/fetch'
+    else if (isStore) uri + '/store'
+    else uri + '/json'
     return request({
-      uri: getURL(this.ctx.deviceSN, message.sessionId, true),
+      uri: uri,
       method: 'POST',
       headers: { Authorization: this.ctx.config.cloudToken },
       body: true,
@@ -292,9 +295,7 @@ class Pipe extends EventEmitter {
         data: res
       }
     }, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        debug(`reqCommand body: ${body}`)
-      }
+      if (error) debug('reqCommand error: ',error) 
     })
   }
   /**
@@ -325,13 +326,13 @@ class Pipe extends EventEmitter {
       },
       body: fs.createReadStream(absolutePath, { start, end })
     }, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        debug(`postResource body: ${body}`)
+      if (error) {
+        debug(`postResource error: ${error}`)
       }
     })
   }
   /**
-   * get resource
+   * get resource (store)
    * @memberof Pipe
    */
   getResource (message) {
