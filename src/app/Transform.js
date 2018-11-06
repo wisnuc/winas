@@ -297,7 +297,7 @@ class Pipe extends EventEmitter {
       }
     }, (error, response, body) => {
       if (error) return debug('reqCommand error: ', error)
-      debug('reqCommand success:', body.status)
+      debug('reqCommand success:',response.statusCode)
     })
   }
   /**
