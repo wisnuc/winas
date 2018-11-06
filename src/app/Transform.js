@@ -285,6 +285,7 @@ class Pipe extends EventEmitter {
     if (isFetch) uri += '/fetch'
     else if (isStore) uri += '/store'
     else uri += '/json'
+    debug(uri)
     return request({
       uri: uri,
       method: 'POST',
