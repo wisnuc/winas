@@ -1307,8 +1307,8 @@ class Boot extends EventEmitter {
     let vol
     if (GLOBAL_CONFIG.type === 'winas') {
       if (GLOBAL_CONFIG.storage.root.uuid) {
-        boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
-        vol = this.ctx.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
+        let boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
+        vol = this.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
       } else {
         return callback(new Error('fake device'))
       }

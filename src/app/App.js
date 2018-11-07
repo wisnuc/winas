@@ -225,42 +225,49 @@ class App extends EventEmitter {
     bootr.patch('/', (req, res, next) => 
       this.boot.PATCH_BOOT(req.user, req.body, err =>
         err ? next(err) : res.status(200).end()))
+    if (GLOBAL_CONFIG.type === 'phi') {
+      bootr.get('/boundVolume/space', (req, res, next) =>
+        this.boot.GET_BoundVolume(req.user, (err, data) =>
+          err ? next(err) : res.status(200).json(data)))
 
-    bootr.get('/boundVolume/space', (req, res, next) => 
-      this.boot.GET_BoundVolume(req.user, (err, data) =>
-        err ? next(err) : res.status(200).json(data)))
+      bootr.post('/boundVolume', (req, res, next) =>
+        this.boot.init(req.body.target, req.body.mode, (err, data) =>
+          err ? next(err) : res.status(200).json(data)))
 
-    bootr.post('/boundVolume', (req, res, next) =>
-      this.boot.init(req.body.target, req.body.mode, (err, data) =>
-        err ? next(err) : res.status(200).json(data)))
+      bootr.put('/boundVolume', (req, res, next) =>
+        this.boot.import(req.body.volumeUUID, (err, data) =>
+          err ? next(err) : res.status(200).json(data)))
 
-    bootr.put('/boundVolume', (req, res, next) =>
-      this.boot.import(req.body.volumeUUID, (err, data) =>
-        err ? next(err) : res.status(200).json(data)))
-        
-    bootr.patch('/boundVolume', (req, res, next) => {
-      let op = req.body.op
-      let value = req.body.value
-      switch (op) {
-        case 'repair':
-          this.boot.repair(value.devices, value.mode, (err, data) => err ? next(err) : res.status(200).json(data))
-          break
-        case 'add':
-          this.boot.add(value.devices, value.mode, (err, data) => err ? next(err) : res.status(200).json(data))
-          break
-        case 'remove':
-          this.boot.remove(value.devices, (err, data) => err ? next(err) : res.status(200).json(data))
-          break
-        default:
-          next(Object.assign(new Error('op not found: ' + op), { status: 404 }))
-          break
-      }
-    })
+      bootr.patch('/boundVolume', (req, res, next) => {
+        let op = req.body.op
+        let value = req.body.value
+        switch (op) {
+          case 'repair':
+            this.boot.repair(value.devices, value.mode, (err, data) => err ? next(err) : res.status(200).json(data))
+            break
+          case 'add':
+            this.boot.add(value.devices, value.mode, (err, data) => err ? next(err) : res.status(200).json(data))
+            break
+          case 'remove':
+            this.boot.remove(value.devices, (err, data) => err ? next(err) : res.status(200).json(data))
+            break
+          default:
+            next(Object.assign(new Error('op not found: ' + op), {
+              status: 404
+            }))
+            break
+        }
+      })
 
-    bootr.delete('/boundVolume', (req, res,next) => 
-      this.boot.uninstall(req.user, req.body, err => 
-        err ? next(err) : res.status(200).end()))
-      
+      bootr.delete('/boundVolume', (req, res, next) =>
+        this.boot.uninstall(req.user, req.body, err =>
+          err ? next(err) : res.status(200).end()))
+    } else {
+      bootr.get('/space', (req, res, next) =>
+        this.boot.GET_BoundVolume(req.user, (err, data) =>
+          err ? next(err) : res.status(200).json(data)))
+    }
+
     routers.push(['/boot', bootr])
 
     // token router
