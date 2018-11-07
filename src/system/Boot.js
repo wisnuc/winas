@@ -1304,11 +1304,21 @@ class Boot extends EventEmitter {
   }
 
   GET_BoundVolume (user, callback) {
-    if (!this.volumeStore.data) return callback(new Error('no bound volume')) // no bound volume
-
-    let vol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
-    if (!vol) return callback(new Error('bound volume not found'))  // bound volume not found
-    if (vol.isMissing) return callback(new Error('bound volume has missing device')) 
+    let vol
+    if (GLOBAL_CONFIG.type === 'winas') {
+      if (GLOBAL_CONFIG.storage.root.uuid) {
+        boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
+        vol = this.ctx.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
+      } else {
+        return callback(new Error('fake device'))
+      }
+    } else {
+      if (!this.volumeStore.data) return callback(new Error('no bound volume')) // no bound volume
+      vol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
+      if (!vol) return callback(new Error('bound volume not found'))  // bound volume not found
+      if (vol.isMissing) return callback(new Error('bound volume has missing device'))
+    }
+    
     child.exec(`df -P "${vol.mountpoint}"`, (err, stdout) => {
       if (!err) {
         let lines = stdout.toString().trim().split('\n')

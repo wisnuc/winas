@@ -329,8 +329,9 @@ class Pipe extends EventEmitter {
       body: fs.createReadStream(absolutePath, { start, end })
     }, (error, response, body) => {
       if (error) {
-        debug(`postResource error: ${error}`)
+        return debug(`postResource error: ${error}`)
       }
+      debug('reqCommand success:',response.statusCode)
     })
   }
   /**
