@@ -339,8 +339,8 @@ class Fruitmix extends EventEmitter {
     let rootDrive = drive.root()
 
     let userDrives = this.driveList.drives.filter(drv => {
-      if (drv.type === 'private' && drv.owner === user.uuid) return true
-      if (drv.type === 'public' && (drv.writelist === '*' || ((drv.writelist.includes(user.uuid)) ||
+      if (drv.privacy === true && drv.owner === user.uuid) return true
+      if (drv.privacy === false && (drv.writelist === '*' || ((drv.writelist.includes(user.uuid)) ||
         (drv.readlist.includes(user.uuid) && user.isAdmin)))) return true
       return false
     })
@@ -562,8 +562,8 @@ class Fruitmix extends EventEmitter {
 
   getDrives (user) {
     let drives = this.driveList.drives.filter(drv => {
-      if (drv.type === 'private' && drv.owner === user.uuid) return true
-      if (drv.type === 'public' &&
+      if (drv.privacy === true && drv.owner === user.uuid) return true
+      if (drv.privacy === false &&
         (drv.writelist === '*' || (drv.writelist.includes(user.uuid) || drv.readlist.includes(user.uuid)))) {
         return true
       }
@@ -580,8 +580,8 @@ class Fruitmix extends EventEmitter {
 
   // internal
   userCanReadDriveMetadata (user, drive) {
-    if (drive.type === 'private' && drive.owner === user.uuid) return true
-    if (drive.type === 'public') {
+    if (drive.privacy === true && drive.owner === user.uuid) return true
+    if (drive.privacy === false) {
       if (user.isAdmin) return true
       if (drive.writelist === '*') return true
       if (Array.isArray(drive.writelist) && drive.writelist.includes(user.uuid)) return true
@@ -593,15 +593,15 @@ class Fruitmix extends EventEmitter {
 
   // internal
   userCanWriteDriveMetadata (user, drive) {
-    if (drive.type === 'private' && drive.owner === user.uuid) return true
-    if (drive.type === 'public' && user.isAdmin) return true
+    if (drive.privacy === true && drive.owner === user.uuid) return true
+    if (drive.privacy === false && user.isAdmin) return true
     return false
   }
 
   // internal
   userCanReadDriveData (user, drive) {
-    if (drive.type === 'private' && drive.owner === user.uuid) return true
-    if (drive.type === 'public') {
+    if (drive.privacy === true && drive.owner === user.uuid) return true
+    if (drive.privacy === false) {
       if (drive.writelist === '*') return true
       if (Array.isArray(drive.writelist) && drive.writelist.includes(user.uuid)) return true
       if (drive.readlist === '*') return true
@@ -612,8 +612,8 @@ class Fruitmix extends EventEmitter {
 
   // internal
   userCanWriteDriveData (user, drive) {
-    if (drive.type === 'private' && drive.owner === user.uuid) return true
-    if (drive.type === 'public') {
+    if (drive.privacy === true && drive.owner === user.uuid) return true
+    if (drive.privacy === false) {
       if (drive.writelist === '*') return true
       if (Array.isArray(drive.writelist) && drive.writelist.includes(user.uuid)) return true
     }
@@ -625,8 +625,8 @@ class Fruitmix extends EventEmitter {
   */
   getDriveList (user) {
     let drives = this.driveList.drives.filter(drv => {
-      if (drv.type === 'private' && drv.owner === user.uuid) return true
-      if (drv.type === 'public') {
+      if (drv.privacy === true && drv.owner === user.uuid) return true
+      if (drv.privacy === false) {
         if (user.isAdmin) return true
         if (drv.writelist === '*') return true
         if (Array.isArray(drv.writelist) && drv.writelist.includes(user.uuid)) return true
@@ -682,7 +682,7 @@ class Fruitmix extends EventEmitter {
   }
 
   getBuiltInDrivePath (user) {
-    let d = this.driveList.drives.find(drv => drv.tag === 'built-in' && drv.type === 'public')
+    let d = this.driveList.drives.find(drv => drv.tag === 'built-in' && drv.privacy === false)
     if(!d) throw Object.assign(new Error(`built-in drive not found`), { status: 404 })
     return path.join(this.fruitmixPath, 'drives', d.uuid)
   }
@@ -702,10 +702,10 @@ class Fruitmix extends EventEmitter {
     }
 
     // validate prop names
-    if (drive.type === 'private') {
+    if (drive.privacy === true) {
       // private drive is not allowed to update
       throw Object.assign(new Error(`private drive is not allowed to update`), { status: 403 })
-    } else if (drive.type === 'public' && drive.tag === 'built-in') {
+    } else if (drive.privacy === false && drive.tag === 'built-in') {
       // built-in public drive, only label can be updated
       if (!Object.getOwnPropertyNames(props).every(name => name === 'label')) {
         let err = new Error('Only label is allowed to update for built-in public drive')     

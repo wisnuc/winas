@@ -414,7 +414,7 @@ class Started extends State {
       .map((drive, idx, arr) => {
         let { uuid } = drive
 
-        if (drive.type === 'public') { // public
+        if (drive.privacy === false) { // public
           if (drive.tag === 'built-in') { // built-in
             return {
               uuid,
@@ -422,7 +422,7 @@ class Started extends State {
               anonymous: true,
             }
           } else { // other public
-            let pubs = arr.filter(d => d.type === 'public' && d.tag !== 'built-in')
+            let pubs = arr.filter(d => d.privacy === false && d.tag !== 'built-in')
             let x = {
               uuid,
               name: drive.label || '共享盘' + (pubs.indexOf(drive) + 1),

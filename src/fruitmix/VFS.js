@@ -131,11 +131,11 @@ class VFS extends EventEmitter {
 
     // figure out valid drive
     let valids = drives.filter(drv => {
-      if (drv.type === 'private') {
+      if (drv.privacy === true) {
         let owner = users.find(u => u.uuid === drv.owner) 
         if (!owner) return false
         return true
-      } else if (drv.type === 'public') {
+      } else if (drv.privacy === false) {
         return true 
       } else {
         return false
@@ -143,12 +143,12 @@ class VFS extends EventEmitter {
     }) 
 
     let toBeRemoved = valids.filter(drv => {
-      if (drv.type === 'private' && drv.isDeleted) {
+      if (drv.privacy === true && drv.isDeleted) {
         let owner = users.find(u => u.uuid === drv.owner) 
         if (!owner || owner.status !== this.user.USER_STATUS.DELETED) return false
         return true
       }
-      if (drv.type === 'public' && drv.isDeleted) return true
+      if (drv.privacy === false && drv.isDeleted) return true
       return false
     }).map(drv => drv.uuid)
 
@@ -210,9 +210,9 @@ class VFS extends EventEmitter {
   }
 
   userCanWriteDrive (user, drive) {
-    if (drive.type === 'private') {
+    if (drive.privacy === true) {
       return user.uuid === drive.owner
-    } else if (drive.type === 'public') {
+    } else if (drive.privacy === false) {
       if (Array.isArray(drive.writelist)) {
         return drive.writelist.includes(user.uuid)
       } else {
@@ -2024,7 +2024,7 @@ class VFS extends EventEmitter {
       return process.nextTick(() => callback(err))
     }
 
-    if (drive.type !== 'private') {
+    if (drive.privacy !== true) {
       let err = new Error('permission denied') 
       err.status = 403      // TODO 404?
       return process.nextTick(() => callback(err))

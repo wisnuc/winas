@@ -53,10 +53,10 @@ class Drive extends EventEmitter {
       let tmpDrives = JSON.parse(JSON.stringify(drives))
       
       tmpDrives.forEach(tD => {
-        if (tD.type === 'private' && deletedUsers.includes(tD.owner)) {
+        if (tD.privacy === true && deletedUsers.includes(tD.owner)) {
           tD.isDeleted = true
         }
-        else if (tD.type === 'public'　&& tD.tag !== 'built-in') {
+        else if (tD.privacy === false　&& tD.tag !== 'built-in') {
           deletedUsers.forEach(dU => {
             if (Array.isArray(tD.writelist)) {
               let wl = new Set(tD.writelist)
@@ -81,7 +81,7 @@ class Drive extends EventEmitter {
       let changeData = typeof data === 'function' ? data(drives) : data
       // check rules
       if (changeData) {
-        let pubDrives = changeData.filter(d => d.type === 'public' && d.writelist !== '*' && !d.isDeleted)
+        let pubDrives = changeData.filter(d => d.privacy === false && d.writelist !== '*' && !d.isDeleted)
         let firstUser = this.user.users.find(u => u.isFirstUser).uuid
         pubDrives.forEach(d => {
           if (!d.writelist.includes(firstUser)) {
@@ -99,8 +99,8 @@ class Drive extends EventEmitter {
   */
   retrieveDrives (userUUID, callback) {
     this.storeSave(drives => {
-      let priv = drives.find(drv => drv.type === 'private' && drv.owner === userUUID)
-      let builtIn = drives.find(drv => drv.type === 'public' && drv.tag === 'built-in')
+      let priv = drives.find(drv => drv.privacy === true && drv.owner === userUUID)
+      let builtIn = drives.find(drv => drv.privacy === false && drv.tag === 'built-in')
 
       if (priv && builtIn) {
         return drives
@@ -109,7 +109,8 @@ class Drive extends EventEmitter {
         if (!priv) {
           newDrives.push({
             uuid: UUID.v4(),
-            type: 'private',
+            type: 'classic',
+            privacy: true,
             owner: userUUID,
             tag: 'home',
             label: '',
@@ -123,7 +124,8 @@ class Drive extends EventEmitter {
         if (!builtIn) {
           newDrives.push({
             uuid: UUID.v4(),
-            type: 'public',
+            type: 'classic',
+            privacy: false,
             writelist: '*',
             readlist: '*',
             label: '',
@@ -139,16 +141,22 @@ class Drive extends EventEmitter {
     }, (err, drives) => {
       err ? callback(err)
         : callback(null, [
-          ...drives.filter(drv => drv.type === 'private' && drv.owner === userUUID),
-          ...drives.filter(drv => drv.type === 'public' && (drv.writelist === '*' || drv.writelist.includes(userUUID)))
+          ...drives.filter(drv => drv.privacy === true && drv.owner === userUUID),
+          ...drives.filter(drv => drv.privacy === false && (drv.writelist === '*' || drv.writelist.includes(userUUID)))
         ])
     })
   }
 
   createPublicDrive (props, callback) {
+
+    if (GLOBAL_CONFIG.type === 'winas') {
+      return callback(Object.assign(new Error('There can be only three public drives'), { status: 400 }))
+    }
+
     let drive = {
       uuid: UUID.v4(),
-      type: 'public',
+      type: 'classic',
+      privacy: false,
       writelist: props.writelist || [],
       readlist: props.readlist || [],
       label: props.label || '',
@@ -160,7 +168,7 @@ class Drive extends EventEmitter {
     // TODO create directory
 
     this.storeSave(drives => {
-      if (drives.filter(d => d.type === 'public' && !d.isDeleted).length >= 3) throw Object.assign(new Error('There can be only three public drives'), { status: 400 })
+      if (drives.filter(d => d.privacy === false && !d.isDeleted).length >= 3) throw Object.assign(new Error('There can be only three public drives'), { status: 400 })
       if (props.label && !drives.filter(d => !d.isDeleted).every(d => d.label !== props.label)) {
         throw Object.assign(new Error('label has already been used'), { status: 400 })
       }
@@ -177,7 +185,7 @@ class Drive extends EventEmitter {
       let index = drives.findIndex(drv => drv.uuid === driveUUID)
       if (index === -1) throw new Error('drive not found')
       let priv = Object.assign({}, drives[index])
-      if (priv.type === 'public') {
+      if (priv.privacy === false) {
         if (props.writelist) {                
           if (props.writelist === '*' || props.writelist.every(uuid => !!this.users.find(u => u.uuid === uuid))) priv.writelist = props.writelist
           else throw new Error('writelist not all user uuid found')
@@ -215,8 +223,8 @@ class Drive extends EventEmitter {
     let drv = this.getDrive(driveUUID)
     if (!drv) return false
     if (drv.isDeleted) return false
-    if (drv.type === 'private' && drv.owner === userUUID) return true
-    if (drv.type === 'public' && (drv.writelist === '*' || drv.writelist.includes(userUUID))) return true
+    if (drv.privacy === true && drv.owner === userUUID) return true
+    if (drv.privacy === false && (drv.writelist === '*' || drv.writelist.includes(userUUID))) return true
     return false
   }
  
@@ -289,7 +297,7 @@ class Drive extends EventEmitter {
       }
       let recognized
       
-      if (drive.type === 'private' || (drive.type === 'public' && drive.tag === 'built-in')) recognized = ['label', 'smb']
+      if (drive.privacy === true || (drive.privacy === false && drive.tag === 'built-in')) recognized = ['label', 'smb']
       else recognized = ['writelist', 'label', 'smb'] // 'readlist',
 
       Object.getOwnPropertyNames(props).forEach(key => {
@@ -320,11 +328,11 @@ class Drive extends EventEmitter {
         }
       })
 
-      if (drive.type === 'public' && !user.isFirstUser) {
+      if (drive.privacy === false && !user.isFirstUser) {
         throw Object.assign(new Error(`requires admin priviledge`), { status: 403 })
       }
 
-      if (drive.type === 'private' && user.uuid !== drive.owner) {
+      if (drive.privacy === true && user.uuid !== drive.owner) {
         throw Object.assign(new Error(`only owner can update`), { status: 403 })
       }
     } catch (e) {
@@ -339,7 +347,7 @@ class Drive extends EventEmitter {
     let driveUUID = props.driveUUID
     if (Object.getOwnPropertyNames(props).length !== 1) return callback(Object.assign(new Error('invalid parameters'), { status: 400 }))
     let drive = this.drives.find(drv => drv.uuid === driveUUID)
-    if (!drive || drive.type !== 'public' || drive.isDeleted) return callback(Object.assign(new Error('invalid driveUUID'), { status: 400 }))
+    if (!drive || drive.privacy !== false || drive.isDeleted) return callback(Object.assign(new Error('invalid driveUUID'), { status: 400 }))
     if (drive.tag === 'built-in') return callback(Object.assign(new Error('built-in drive can not be deleted'), { status: 400 }))
     this.deleteDrive(driveUUID, props, callback)
   }

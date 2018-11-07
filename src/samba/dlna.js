@@ -130,7 +130,7 @@ class Initialize extends State {
 
   getMediaPath() {
     let publicDrive = this.ctx.drive.drives.find(item => 
-      item.tag === 'built-in' && item.type === 'public')
+      item.tag === 'built-in' && item.privacy === false)
     if (publicDrive) return path.join(this.ctx.froot, 'drives', publicDrive.uuid)
     else return null
   }
