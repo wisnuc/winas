@@ -265,7 +265,7 @@ class Parsing extends State {
           if (op === 'rename' || op === 'dup') {
             if (this.ctx.args.fromName === this.ctx.args.toName) throw new Error('two distinct names required')
           }
-        } else if (op === 'remove') {
+        } else if (op === 'remove' || op === 'archive' || op === 'delete') {
           Object.assign(this.ctx.args, { op, uuid })
           if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
         } else if (op === 'addTags' || op === 'removeTags' || op === 'setTags') {
@@ -446,7 +446,23 @@ class Executing extends State {
             ? this.setState(Failed, err) 
             : this.setState(Succeeded, null))
           break
-
+        
+        case 'archive':
+          this.ctx.ctx.apis.archive({
+            name: args.toName,
+            uuid: args.uuid
+          }, err => err 
+            ? this.setState(Failed, err) 
+            : this.setState(Succeeded, null))
+          break
+        case 'delete':
+          this.ctx.ctx.apis.delete({
+            name: args.toName,
+            uuid: args.uuid
+          }, err => err 
+            ? this.setState(Failed, err) 
+            : this.setState(Succeeded, null))
+          break
         case 'rename':
           this.ctx.ctx.apis.rename({
             fromName: args.fromName,

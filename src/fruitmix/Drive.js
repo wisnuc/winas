@@ -176,6 +176,52 @@ class Drive extends EventEmitter {
     }, (err, drives) => err ? callback(err) : callback(null, drive))
   }
 
+  createBackupDrive (user, props, callback) {
+    let client = typeof props.client === 'object' ? props.client : {}
+    let drive = {
+      uuid: UUID.v4(),
+      type: 'backup',
+      owner: user.uuid,
+      label: props.label || '',
+      smb: false,
+      client,
+      ctime: new Date().getTime(),
+      mtime: new Date().getTime()
+    }
+
+    this.storeSave(drives => [...drives, drive]
+    , (err, drives) => err ? callback(err) : callback(null, drive))
+  }
+
+  updateBackupDrive (user, props, callback) {
+    this.storeSave(drives => {
+      let index = drives.findIndex(drv => drv.uuid === driveUUID)
+      if (index === -1) throw new Error('backup drive not found')
+      let priv = Object.assign({}, drives[index])
+      if (user.uuid !== priv.owner) throw new Error('Permission Denied')
+      if (typeof props.smb === 'boolean') {
+        priv.smb = props.smb
+      }
+      if (props.label) priv.label = props.label
+      if (props.client && typeof props.client === 'object') priv.client = props.client
+      priv.mtime = new Date().getTime()
+      return [...drives.slice(0, index), priv, ...drives.slice(index + 1)]
+    }, (err, data) => err ? callback(err) : callback(null, data.find(d => d.uuid === driveUUID)))
+  }
+
+  deleteBackupDrive (user, callback) {
+    this.storeSave(drives => {
+      let index = drives.findIndex(drv => drv.uuid === driveUUID)
+      if (index === -1) throw Object.assign(new Error('backup drive not found'), { status: 404 })
+      let drv = Object.assign({}, drives[index])
+      if (user.uuid !== drv.owner) throw new Error('Permission Denied')
+      if (drv.isDeleted) throw Object.assign(new Error('backup drive not found'), { status: 404 }) 
+      drv.isDeleted = true
+      drv.mtime = new Date().getTime()
+      return [...drives.slice(0, index), drv, ...drives.slice(index + 1)]
+    }, (err, data) => err ? callback(err) : callback(null, null))
+  }
+
   getDrive (driveUUID) {
     return this.drives.find(d => d.uuid === driveUUID)
   }
@@ -203,7 +249,7 @@ class Drive extends EventEmitter {
     }, (err, data) => err ? callback(err) : callback(null, data.find(d => d.uuid === driveUUID)))
   }
 
-   deleteDrive (driveUUID, props, callback) {
+  deleteDrive (driveUUID, props, callback) {
     this.storeSave(drives => {
       let index = drives.findIndex(drv => drv.uuid === driveUUID)
       if (index === -1) throw Object.assign(new Error('drive not found'), { status: 404 })

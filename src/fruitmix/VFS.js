@@ -131,11 +131,11 @@ class VFS extends EventEmitter {
 
     // figure out valid drive
     let valids = drives.filter(drv => {
-      if (drv.privacy === true) {
-        let owner = users.find(u => u.uuid === drv.owner) 
+      if (drv.privacy === true || drv.type === 'backup') {
+        let owner = users.find(u => u.uuid === drv.owner)
         if (!owner) return false
         return true
-      } else if (drv.privacy === false) {
+      } else if (drv.privacy === false ) {
         return true 
       } else {
         return false
@@ -143,12 +143,12 @@ class VFS extends EventEmitter {
     }) 
 
     let toBeRemoved = valids.filter(drv => {
-      if (drv.privacy === true && drv.isDeleted) {
+      if ((drv.privacy === true || drv.type === 'backup') && drv.isDeleted) {
         let owner = users.find(u => u.uuid === drv.owner) 
         if (!owner || owner.status !== this.user.USER_STATUS.DELETED) return false
         return true
       }
-      if (drv.privacy === false && drv.isDeleted) return true
+      if ((drv.privacy === false) && drv.isDeleted) return true
       return false
     }).map(drv => drv.uuid)
 
@@ -210,7 +210,7 @@ class VFS extends EventEmitter {
   }
 
   userCanWriteDrive (user, drive) {
-    if (drive.privacy === true) {
+    if (drive.privacy === true || drive.type === 'backup') {
       return user.uuid === drive.owner
     } else if (drive.privacy === false) {
       if (Array.isArray(drive.writelist)) {
@@ -230,7 +230,7 @@ class VFS extends EventEmitter {
     }
 
     let drive = this.drives.find(drv => drv.uuid === dir.root().uuid)
-    return drive && userCanWriteDrive(user, drive)
+    return drive && this.userCanWriteDrive(user, drive)
   }
 
 
@@ -612,7 +612,37 @@ class VFS extends EventEmitter {
   DUP (user, props, callback) {
   }
 
+  // only use for backup drive when user had delete local file/folder
+  BACKUP_ARCHIVE(user, props, callback) {
+    let { driveUUID } = props
+    let specified = this.drives.find(d => d.uuid === driveUUID)
+    if (!specified || specified.isDeleted || !this.userCanWriteDrive(user, specified) || specified.type !== 'backup') {
+      let err = new Error('drive not found')
+      err.status = 404
+      return process.nextTick(() => callback(err))
+    }
+    this.DIR(user, props, (err, dir) => {
+      let { name } = props 
+      // let target = path.join(this.absolutePath(dir), name)
+      // rimraf(target, err => callback(err))  
+    })
+  }
 
+  // only use for backup drive when user want delete backup file/folder
+  BACKUP_DELETE(user, props, callback) {
+    let { driveUUID } = props
+    let specified = this.drives.find(d => d.uuid === driveUUID)
+    if (!specified || specified.isDeleted || !this.userCanWriteDrive(user, specified) || specified.type !== 'backup') {
+      let err = new Error('drive not found')
+      err.status = 404
+      return process.nextTick(() => callback(err))
+    }
+    this.DIR(user, props, (err, dir) => {
+      let { name } = props 
+      // let target = path.join(this.absolutePath(dir), name)
+      // rimraf(target, err => callback(err))  
+    })
+  }
 
   /**
   @param {object} user

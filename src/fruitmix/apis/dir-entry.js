@@ -20,6 +20,16 @@ class DirEntryApi {
     this.vfs.REMOVE(user, props, callback)
   }
 
+  archive (user, dirProps, dataProps, callback) {
+    let props = Object.assign({}, dataProps, dirProps)
+    this.vfs.BACKUP_ARCHIVE(user, props, callback)
+  }
+
+  delete (user, dirProps, dataProps, callback) {
+    let props = Object.assign({}, dataProps, dirProps)
+    this.vfs.BACKUP_DELETE(user, props, callback)
+  }
+
   rename (user, dirProps, dataProps, callback) {
     let props = Object.assign({}, dataProps, dirProps)
     this.vfs.RENAME(user, props, callback)
@@ -55,6 +65,8 @@ class DirEntryApi {
       tmpfile: this.vfs.TMPFILE.bind(this.vfs),
       mkdir: this.mkdir.bind(this, user, dirProps),
       remove: this.remove.bind(this, user, dirProps),
+      archive: this.archive.bind(this, user, dirProps),
+      delete: this.delete.bind(this, user, dirProps),
       rename: this.rename.bind(this, user, dirProps),
       newfile: this.newfile.bind(this, user, dirProps),
       append: this.append.bind(this, user, dirProps),
