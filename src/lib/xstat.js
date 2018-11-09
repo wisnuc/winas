@@ -130,7 +130,7 @@ const readXattr = (target, stats, callback) => {
     }
 
     if (stats.isDirectory()) {
-      if (Object.keys(orig).length !== 1) attr.dirty = undefined
+      // if (Object.keys(orig).length !== 1) attr.dirty = undefined
     } else {
       if (orig.hasOwnProperty('hash') || orig.hasOwnProperty('time')) {
         if (isSHA256(orig.hash) && orig.time === stats.mtime.getTime()) {
@@ -190,6 +190,21 @@ const readXattr = (target, stats, callback) => {
         }
       }
     }
+
+    // for backup dirs
+    if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
+      if (orig.hasOwnProperty('archived') && orig.archived !== true) {
+        attr.dirty = undefined
+      } else {
+        attr.archived = true
+      }
+      if (orig.hasOwnProperty('deleted') && orig.deleted !== true) {
+        attr.dirty = undefined
+      } else {
+        attr.deleted = true
+      }
+    }
+
     callback(null, attr)
   })
 }
@@ -273,6 +288,10 @@ const createXstat = (target, stats, attr) => {
     }
   }
 
+  // add for backup dirs/ files
+  if (attr.archived) xstat.archived = attr.archived
+  if (attr.deleted) xstat.deleted = attr.deleted
+
   return xstat
 }
 
@@ -351,7 +370,7 @@ This function is supposed to be used only for temporary file
 @param {number[]} [props.tags] - preserve tags, accept empty array
 */
 const forceXstat = (target, props, callback) => {
-  let { uuid, hash, tags } = props || {}
+  let { uuid, hash, tags, archived, deleted } = props || {}
 
   if (uuid && !isUUID(uuid)) {
     let err = new Error('invalid uuid')
@@ -363,6 +382,12 @@ const forceXstat = (target, props, callback) => {
 
   if (hash && !isSHA256(hash)) {
     let err = new Error('invalid hash/fingerprint')
+    err.code = 'EINVAL'
+    return process.nextTick(() => callback(err))
+  }
+
+  if ((archived && archived !== true) || (deleted && deleted !== true)) {
+    let err = new Error('invalid archived/deleted')
     err.code = 'EINVAL'
     return process.nextTick(() => callback(err))
   }
@@ -389,6 +414,9 @@ const forceXstat = (target, props, callback) => {
       }
       if (tags) attr.tags = tags
     }
+
+    attr.archived = archived
+    attr.deleted = deleted
 
     updateXattr(target, attr, stat.isFile(), (err, attr) => {
       if (err) return callback(err)
