@@ -657,8 +657,7 @@ class VFS extends EventEmitter {
           attr.deleted = true
           attr.hash = undefined
           xattr.setSync(tmpFile, 'user.fruitmix', JSON.stringify(attr))
-          // fs.renameSync(tmpFile, dstFile)
-          child.execSync(`mv ${ tmpFile } ${ dstFile }`)
+          fs.renameSync(tmpFile, dstFile)
           return dir.read(callback)
         } catch (e) {
           return callback(e)
@@ -672,7 +671,7 @@ class VFS extends EventEmitter {
           attr.deleted = true
           xattr.setSync(tmpDir, 'user.fruitmix', JSON.stringify(attr))
           rimraf.sync(dirPath)
-          fs.renameSync(tmpDir, dirPath)
+          child.execSync(`mv ${ tmpFile } ${ dstFile }`)
           return dir.read(callback)
         } catch (e) {
           return callback(e)
