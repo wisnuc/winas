@@ -141,7 +141,7 @@ class Drive extends EventEmitter {
     }, (err, drives) => {
       err ? callback(err)
         : callback(null, [
-          ...drives.filter(drv => drv.privacy === true && drv.owner === userUUID),
+          ...drives.filter(drv => (drv.privacy === true || drv.type === 'backup') && drv.owner === userUUID),
           ...drives.filter(drv => drv.privacy === false && (drv.writelist === '*' || drv.writelist.includes(userUUID)))
         ])
     })
@@ -280,7 +280,7 @@ class Drive extends EventEmitter {
     let drv = this.getDrive(driveUUID)
     if (!drv) return false
     if (drv.isDeleted) return false
-    if (drv.privacy === true && drv.owner === userUUID) return true
+    if ((drv.privacy === true || drv.type === 'backup') && drv.owner === userUUID) return true
     if (drv.privacy === false && (drv.writelist === '*' || drv.writelist.includes(userUUID))) return true
     return false
   }
@@ -315,6 +315,9 @@ class Drive extends EventEmitter {
    * @param {Function} callback
    */
   POST (user, props, callback) {
+    if (props.op && props.op === 'backup') {
+      return this.createBackupDrive(user, props, callback)
+    }
     let recognized = ['writelist', 'label'] // 'readlist',
     try {
       Object.getOwnPropertyNames(props).forEach(name => {
@@ -345,6 +348,9 @@ class Drive extends EventEmitter {
   }
 
   PATCH (user, props, callback) {
+    if (props.op && props.op === 'backup') {
+      return this.updateBackupDrive(user, props, callback)
+    }
     let driveUUID = props.driveUUID
     delete props.driveUUID
     try {
@@ -400,6 +406,9 @@ class Drive extends EventEmitter {
   }
 
   DELETE (user, props, callback) {
+    if (props.op && props.op === 'backup') {
+      return this.deleteBackupDrive(user, props, callback)
+    }
     if (!user || !user.isFirstUser) return callback(Object.assign(new Error('Permission Denied'), { status: 403 }))
     let driveUUID = props.driveUUID
     if (Object.getOwnPropertyNames(props).length !== 1) return callback(Object.assign(new Error('invalid parameters'), { status: 400 }))
