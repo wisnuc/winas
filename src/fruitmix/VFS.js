@@ -3,6 +3,7 @@ const path = require('path')
 const fs = Promise.promisifyAll(require('fs'))
 const EventEmitter = require('events')
 const crypto = require('crypto')
+const child = require('child_process')
 
 const mkdirp = require('mkdirp')
 const mkdirpAsync = Promise.promisify(mkdirp)
@@ -656,7 +657,8 @@ class VFS extends EventEmitter {
           attr.deleted = true
           attr.hash = undefined
           xattr.setSync(tmpFile, 'user.fruitmix', JSON.stringify(attr))
-          fs.renameSync(tmpFile, dstFile)
+          // fs.renameSync(tmpFile, dstFile)
+          child.execSync(`mv ${ tmpFile } ${ dstFile }`)
           return dir.read(callback)
         } catch (e) {
           return callback(e)

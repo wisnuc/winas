@@ -162,7 +162,8 @@ class Drive extends EventEmitter {
       label: props.label || '',
       smb: true,
       ctime: new Date().getTime(),
-      mtime: new Date().getTime()
+      mtime: new Date().getTime(),
+      isDeleted: false
     }
 
     // TODO create directory
@@ -197,7 +198,8 @@ class Drive extends EventEmitter {
       smb: false,
       client,
       ctime: new Date().getTime(),
-      mtime: new Date().getTime()
+      mtime: new Date().getTime(),
+      isDeleted: false
     }
 
     this.storeSave(drives => [...drives, drive]
