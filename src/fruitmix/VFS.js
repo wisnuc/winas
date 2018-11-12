@@ -488,6 +488,7 @@ class VFS extends EventEmitter {
   */
   REMOVE (user, props, callback) {
     this.DIR(user, props, (err, dir) => {
+      if (err) return callback(err)
       let { name } = props 
       let target = path.join(this.absolutePath(dir), name)
       rimraf(target, err => callback(err))  
@@ -622,9 +623,15 @@ class VFS extends EventEmitter {
       return process.nextTick(() => callback(err))
     }
     this.DIR(user, props, (err, dir) => {
-      let { name } = props 
-      // let target = path.join(this.absolutePath(dir), name)
-      // rimraf(target, err => callback(err))  
+      if (err) return callback(err)
+      let { name } = props
+        let dstPath = name ? path.join(this.absolutePath(dir), name) : this.absolutePath(dir)
+        try {
+          let attr = JSON.parse(xattr.getSync(dstPath, 'user.fruitmix'))
+          attr.archived = true
+          xattr.setSync(dstPath, 'user.fruitmix', JSON.stringify(attr))
+          return dir.read(callback)
+        } catch (e) { callback(e)}
     })
   }
 
@@ -638,9 +645,37 @@ class VFS extends EventEmitter {
       return process.nextTick(() => callback(err))
     }
     this.DIR(user, props, (err, dir) => {
+      if (err) return callback(err)
       let { name } = props 
-      // let target = path.join(this.absolutePath(dir), name)
-      // rimraf(target, err => callback(err))  
+      if (name) { // file
+        try {
+          let tmpFile = this.TMPFILE()
+          let dstFile = path.join(this.absolutePath(dir), name)
+          fs.createWriteStream(tmpFile).end()
+          let attr = JSON.parse(xattr.getSync(dstFile, 'user.fruitmix'))
+          attr.deleted = true
+          attr.hash = undefined
+          xattr.setSync(tmpFile, 'user.fruitmix', JSON.stringify(attr))
+          fs.renameSync(tmpFile, dstFile)
+          return dir.read(callback)
+        } catch (e) {
+          return callback(e)
+        }
+      } else { // dir
+        let tmpDir = path.join(this.tmpDir, UUID.v4())
+        let dirPath = this.absolutePath(dir)
+        try {
+          mkdirp.sync(tmpDir)
+          let attr = JSON.parse(xattr.getSync(dirPath, 'user.fruitmix'))
+          attr.deleted = true
+          xattr.setSync(tmpDir, 'user.fruitmix', JSON.stringify(attr))
+          rimraf.sync(dirPath)
+          fs.renameSync(tmpDir, dirPath)
+          return dir.read(callback)
+        } catch (e) {
+          return callback(e)
+        } 
+      }
     })
   }
 

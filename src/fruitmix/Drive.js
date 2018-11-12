@@ -176,6 +176,17 @@ class Drive extends EventEmitter {
     }, (err, drives) => err ? callback(err) : callback(null, drive))
   }
 
+  /**
+   * 
+   * @param {*} user 
+   * @param {*} props 
+   * props.client
+   *  client.id
+   *  client.type
+   *  client.bptime
+   *  client.isFinished
+   * @param {*} callback 
+   */
   createBackupDrive (user, props, callback) {
     let client = typeof props.client === 'object' ? props.client : {}
     let drive = {
