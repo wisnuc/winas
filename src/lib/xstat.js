@@ -193,14 +193,11 @@ const readXattr = (target, stats, callback) => {
 
     // for backup dirs
     if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
-      if (orig.hasOwnProperty('archived') && orig.archived !== true) {
-        attr.dirty = undefined
-      } else {
+      if (orig.hasOwnProperty('archived') && orig.archived === true) {
         attr.archived = true
       }
-      if (orig.hasOwnProperty('deleted') && orig.deleted !== true) {
-        attr.dirty = undefined
-      } else {
+
+      if (orig.hasOwnProperty('deleted') && orig.deleted === true) {
         attr.deleted = true
       }
     }
@@ -289,8 +286,8 @@ const createXstat = (target, stats, attr) => {
   }
 
   // add for backup dirs/ files
-  if (attr.archived) xstat.archived = attr.archived
-  if (attr.deleted) xstat.deleted = attr.deleted
+  xstat.archived = attr.archived
+  xstat.deleted = attr.deleted
 
   return xstat
 }
