@@ -177,11 +177,11 @@ class Heading extends State {
       }
 
       if (!isNonNullObject(filename) || Array.isArray(filename)) throw new Error('invalid filename field')
-      let { op, hash, size, sha256, policy } = filename 
+      let { op, hash, size, sha256, policy, uptype, bfilename, bctime, bmtime } = filename 
       if (op === 'newfile') {
-        Object.assign(this.ctx.args, { op, size, sha256, policy })
+        Object.assign(this.ctx.args, { op, size, sha256, policy, uptype, bfilename, bctime, bmtime })
       } else if (op = 'append') {
-        Object.assign(this.ctx.args, { op, hash, size, sha256 })
+        Object.assign(this.ctx.args, { op, hash, size, sha256, uptype, bfilename, bctime, bmtime })
       } else {
         Object.assign(this.ctx.args, { op, hash, size, sha256, policy })
       }
@@ -392,7 +392,11 @@ class Executing extends State {
             data: args.data,
             size: args.size,
             sha256: args.sha256,
-            policy: args.policy
+            policy: args.policy,
+            bfilename: args.bfilename,
+            bctime: args.bctime,
+            bmtime: args.bmtime,
+            uptype: args.uptype
           }, (err, xstat, resolved) => {
             if (err) {
               this.setState(Failed, err)
@@ -409,7 +413,10 @@ class Executing extends State {
             hash: args.hash,
             data: args.data,
             size: args.size,
-            sha256: args.sha256 
+            sha256: args.sha256,
+            bfilename: args.bfilename,
+            bctime: args.bctime,
+            bmtime: args.bmtime
           }, (err, xstat) => {
             if (err) {
               this.setState(Failed, err)

@@ -20,7 +20,7 @@ const sanitize = require('sanitize-filename')
 const xattr = require('fs-xattr')       // TODO remove
 const { saveObjectAsync } = require('../lib/utils')
 const autoname = require('../lib/autoname')
-const { isUUID, isSHA256 } = require('../lib/assertion')
+const { isUUID, isSHA256, isNonEmptyString } = require('../lib/assertion')
 
 
 const Node = require('./vfs/node')
@@ -509,14 +509,34 @@ class VFS extends EventEmitter {
   @param {string} props.sha256 - file hash (fingerprint)
   */
   NEWFILE (user, props, callback) {
-    let { name, data, size, sha256 } = props
-
+    if (props.uptype === 'backup') {
+      return this.BACKUP_NEWFILE(user, props, callback)
+    }
+    let { name, data, size, sha256, uptype } = props
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (!props.policy) props.policy = [null, null]
       let target = path.join(this.absolutePath(dir), props.name)
       mkfile(target, props.data, props.sha256 || null, props.policy, callback)
     }) 
+  }
+
+  BACKUP_NEWFILE(user, props, callback) {
+    // TODO: validate bfilename bctime bmtime
+    let { name, data, sha256, bfilename, bctime, bmtime } = props
+    this.DIR(user, props, (err, dir) => {
+      if (err) return callback(err)
+      let target = path.join(this.absolutePath(dir), name)
+      forceXstat(data, {
+        bfilename, bctime, bmtime, hash: sha256 || null
+      }, (err, xstat) => {
+        if (err) return callback(err)
+        fs.rename(data, target, err => {
+          if (err) return callback(err)
+          return callback(null, xstat)
+        })
+      })
+    })
   }
 
   /**
