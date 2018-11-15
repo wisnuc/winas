@@ -403,8 +403,9 @@ class VFS extends EventEmitter {
   MKDIR (user, props, callback) {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
+      if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
       if (!props.policy) props.policy = [null, null]
- 
+      
       let target = path.join(this.absolutePath(dir), props.name)
       /**
       FIXME: This function is problematic. readXattr may race!
@@ -521,11 +522,12 @@ class VFS extends EventEmitter {
     }) 
   }
 
-  BACKUP_NEWFILE(user, props, callback) {
+  BACKUP_NEWFILE (user, props, callback) {
     // TODO: validate bfilename bctime bmtime
     let { name, data, sha256, bfilename, bctime, bmtime } = props
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
+      if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
       let target = path.join(this.absolutePath(dir), name)
       forceXstat(data, {
         bfilename, bctime, bmtime, hash: sha256 || null
