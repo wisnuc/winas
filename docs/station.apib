@@ -1,0 +1,3439 @@
+FORMAT: 1A
+HOST: http://phi-station:3000
+
+REF: http://www.restapitutorial.com/lessons/restfulresourcenaming.html
+
+REF: https://raw.githubusercontent.com/danielgtaylor/aglio/master/example.apib
+
+# Phicomm Station APIs
+
+本文档描述Phicomm Station的API服务。
+
+## 进度说明
+
+20180528
+
+以下每项标注：
+
++ API设计完成与否；
++ API实现完成与否；
++ API测试完成与否；
++ 是否有已知bug；
+
+**Boot**
+
++ API设计完成，但在根据客户端需求变更；
++ API实现：基础的启动、初始化、导入磁盘卷功能完成，修复磁盘卷功能部分完成, 加减盘功能完成；
++ API测试：尚无自动化测试，自动化测试需要在fruitmix全部api完成后做；
++ 有已知bug；
+
+**Device** 
+
+（新API）
+
+Device API主要用于描述设备的静态和运行时信息，目前部分内容在Boot中提供（例如deviceSN），但诸多与设备和系统相关的信息，和Boot API状态机的生命周期不一致，应该移动到Device API。
+
++ API设计尚未完成，部分信息目前在Boot中提供；
++ API实现，部分完成；
++ API测试，暂无自动化测试计划；
+
+**Users** 
+
++ API设计完成；
++ API代码完成；
++ API单元测试尚未完成；
++ 有已知bug；
+
+**Token** 
+
++ API设计完成；
++ API代码完成；
++ API单元测试完成；
+
+**Drives** 
+
++ API设计完成；
++ API代码完成；
++ API单元测试尚未完成；
++ 有已知bug：未知；
++ 其他：需性能参数调优；
+
+**Files** 
+
++ API设计完成；
++ API代码完成；
++ API测试尚未完成；
++ 有已知bug
+
+尚未支持音频文件
+
+**Tags**
+
++ API设计完成；
++ API代码完成；
++ API单元测试未完成；
++ 有已知bug（集成测试）
+
+**Media**
+
++ API设计完成；
++ API代码完成；
++ API单元测试未完全覆盖；
+
+**Tasks**
+
+API设计未完成；
+
++ API设计完成；（有极端情况待定）
++ API代码完成；（20180528版）
++ API单元测试未完成
+
+**PhyDrives**
+
++ API设计完成；
++ API代码完成；
++ API单元测试完成；
+
+**Transmission**
+
+API设计、代码、和单元测试完成，尚未Rewiew（包括API设计）。
+
+**其他**
+
+1. samba，dlna的配置api尚未提供；
+2. 文件类型支持尚未完成；
+
+## 云访问说明
+
+pipe 通道, message 中 data 格式
+```json
+{   
+    "verb": "GET", // 'GET', 'POST', 'PATCH', 'PUT', 'DELETE'
+    "urlPath": "/drives/:driveUUID/dirs/:dirUUID", // router path
+    "body": {},    // req.body
+    "params": {}   // req.params
+}
+```
+
+APP通过云服务远程访问NAS设备, command 请求中 body 格式
+```json
+{
+    "common": {
+        "deviceSN":"设备SN号",
+        "msgId":"消息ID"
+    },
+    "data": {
+        "err": {
+            "msg": "must be either wildcard or an uuid array", // error message
+            "status": 400 // 遵循 http code
+        },  // 没有 err 时， err 为 null
+        "res": {} // 跟本地调用 api 返回格式一致
+    }
+}
+```
+
+APP通过云服务远程访问NAS设备, resource 请求中 data 格式
+```json
+{
+    "err": {
+            "msg": "must be either wildcard or an uuid array", // error message
+            "status": 400 // 遵循 http code
+        },  // 没有 err 时， err 为 null
+    "res": {} // 跟本地调用 api 返回格式一致
+}
+```
+
+## Policy说明
+
+在文件上传（`/drives/xxxx/dirs/xxxx/entries`）和Task资源中使用了Policy数据结构解决文件或文件夹名冲突的问题。
+
+Policy在执行文件或文件夹操作时提供一种策略，指定在遇到同名文件或文件夹时如何处理。
+
+Policy的数据结构定义如下：
+
+```js
+Policy [same, diff]
+```
+
+Policy是一个数组，包含两个字符串，其中第一个字符串是目标和源是相同类型时，解决冲突的策略；第二个字符串是目标和源是不同类型是，解决冲突的策略。
+
+分开两个策略是考虑到业务的合理性，例如复制文件时，如果用户的要求是覆盖，在遇到同名文件时覆盖是合理的，但是遇到同名文件夹覆盖就是不合理的。
+
+Policy的取值包括：`null`, `skip`, `keep`,`replace`, `rename`。
+
+- null - 无策略，在遇到冲突时返回错误（上传），或者子任务进入`Conflict`状态，等待用户操作；
+- skip - 遇到同名跳过；
+- keep - 仅适用于源是文件夹时的same值，如果源是文件或者用于diff值则视为非法；在遇到文件夹名称冲突时会保留并进入文件夹继续复制或移动子文件夹和文件；如果在同样场景采用skip策略则会跳过该文件夹，不继续操作文件夹内部内容；
+- replace - 替换；对于文件来说是覆盖，对于文件夹来说是删除原来的文件夹；如果用于diff情况，则先删除目标再建立新的；
+- rename - 自动重命名
+
+## 文件的Hash/Fingerprint说明
+
+Fruitmix文件系统为所有文件计算hash，用于两个目的：
+
+1. 在文件传输时校验文件完整性；
+2. 在引用文件时用hash作为标识符（例如media api）；
+
+文件的hash计算以sha256算法为基础，对于文件大小满足：0 <= size <= 1GB (1024^3)时，使用文件的sha256作为其hash；当文件大小大于1GB时，采用下述算法计算其hash；
+
+在接口的属性命名时，特别使用`fingerprint`作为文件hash的名称，以区别与hash和sha256这两个名词。
+
+完整计算方法如下：
+
+当文件大小 0 <= size <= 1GB时：
+
+fingerprint = sha256(file)
+
+当文件大小为 0 <= size <= 2GB时，将文件分为两部分，前面1GB的部分计算其sha256为h0，后面多出的部分计算其sha256为h1，则文件的fingerprint定义为：
+
+fingerprint = sha256(h0 + h1)
+
+h0 + h1为byte by byte concatenation，即h0是一个32字节的byte array，h1是一个32字节的byte array，把两个byte array衔接成一个64字节的byte array，然后把它当作一个文件流计算其sha256；
+
+以此类推，如果文件大小为 0 <= size <= 3GB时，用h0, h1, h2分别表示其按照1GB分割的3个chunk的sha256值，则整个文件的fingerprint为：
+
+fingerprint = sha256(sha256(h0 + h1) + h2)
+
+该方法定义的fingerprint保证：
+
+1. 在大文件上传时，可以用递增的方式计算其fingerprint；
+2. 在部分文件完成传输（必须是1GB的整数倍）时，其已经计算的fingerprint可以持久化在文件系统中，在继续上传时（drive api的`append`操作）可以继续计算；
+
+注意：
+
+1. 空文件的fingerprint是sha256('')，这是合法的；
+2. 按照前述定义`append`操作禁止向空文件添加文件块；
+3. 向已有文件`append`文件块时，已有文件必须是1GB的整数倍（n > 0），文件块的大小是 0 < chunk size <= 1GB，即至少1 byte，不可以为0 byte，最大1GB（含1GB）。
+
+检查fingerprint算法可以用以下例子验证：
+
+用0xAA填充一个大小为1073741825字节（1024 * 1024 * 1024 + 1）的文件，其fingerprint为：
+
+```
+97a195db9d0dd86f07771142bf9cca2b8ba48001e974bbe490f7f3ac5ffa6231
+```
+
+## Data Structures
+
+### TStoragePort
++ path: `/devices/pci0000:00/0000:00:01.1/ata1/ata_port/ata1` (required) - Linux设备的sysfs路径
++ subsystem: ata_port (required) - 该port所在的Linux设备子系统，目前仅支持ata_port
+
+### TStorageBlock
++ name: sda - 设备名
++ devname: `/dev/sda` - 完整的设备名，也是Linux device fs的路径
++ path: `/devices/pci0000:00/0000:00:0d.0/ata3/host2/target2:0:0/2:0:0:0/block/sda` - Linux设备的sysfs路径
++ removable: false (boolean) - 内核判断的该设备是否为可插拔设备
+
+### TUserBasic
++ uuid: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (required) - 本地分配的用户UUID
++ username: Alice (required) - 昵称
++ isFirstUser: true (boolean, required) - 是否为管理员
++ createTime: `123456` (number, required) - 本地用户账户的创建时间
++ status: ACTIVE (required) - 枚举类型，合法值包括`ACTIVE`和`INACTIVE`
++ phicommUserId: `123456` (required) - 斐讯用户Id
++ phoneNumber: `13333333333` (required) - 用户注册手机号
+
+### TUserFull
++ Include TUserBasic
++ password: true (boolean, required) - 显示是否已经设置该密码；
++ smbPassword: false (boolean, required) - 显示是否已经设置该密码；
+
+### TDrive
++ uuid: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (required) - drive id
+
+### TPrivateDrive (TDrive)
++ type: classic (required) - drive type
++ privacy: true (required) - drive privacy
++ owner: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (required) - owner user uuid
++ tag: home (required) - private drive usage
++ label: home (required) - drive label
++ uuid: uuid string (required) - drive uuid
++ smb: true (required) - samba rw need password
++ ctime
++ mtime 
+
+### TPublicDrive (TDrive)
++ type: classic (required) - drive type
++ privacy: false (required) - drive privacy
++ writelist: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (array, required) - a list of users that have write permission
++ readlist: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (array, required) - a list of users that have read permission
++ label: family photo (required) - drive label
++ uuid: uuid string (required) - drive uuid
++ smb: true (required) - samba rw need password
++ ctime
++ mtime
+
+### TBackupClientInfo
++ type
++ id
++ lastTime
+
+### TBackupDrive (TDrive)
++ type: backup (required) - drive type
++ label: iphone x (required) - drive label
++ owner: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (required) - owner user uuid
++ uuid: uuid string (required) - drive uuid
++ smb: true (required) - samba rw need password
++ ctime
++ mtime
++ client
+    + Include TBackupClientInfo
+
+### TPhyDrive
++ id: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (required) - 文件系统的id，可以是磁盘卷UUID或者设备名；
++ type: `btrfs` (required) - 文件系统类型
++ isUSB: true - 是否为usb设备
+
+### TPhyDriveUsage
++ Include TPhyDrive
++ usage
+    + total
+    + used
+    + available
+
+### Metadata
++ type: `JPG` - (required) - 文件类型
++ width: 1920 (number)
++ height: 1080 (number)
+
+### QFile
++ uuid: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (optional) - 文件的uuid
++ pdir: `e21d5b34-9776-4ff3-bbe6-82b5745a7a15` (required) - 文件所在文件夹（父文件夹）的uuid
++ type: file (optional) - 在混合文件和文件夹时表示类型为文件
++ name: `alonzo.jpg` (required) - 文件名称
++ size: 39499 (number, required) - 文件大小
++ mtime: 1528715584499 (number)
++ hash: `8e28737e8cdf679e65714fe2bdbe461c80b2158746f4346b06af75b42f212408`
++ tags: 1,2 (array[number], optional) 
++ metadata (Metadata)
++ place: 0 (number, required)
++ namepath: foo, alonzo.jpg (array)
+
+### QDirectory
++ uuid: `6f030ed2-a851-4f81-805c-3e6209349df3`
++ pdir: `d9ec3719-beb9-43e6-acd2-98e528f3f31b`
++ type: directory
++ name: foo
++ mtime: 1528715585399 (number)
++ place: 0 (number)
++ namepath: foo (array)
+
+# Group Boot
+
+## Boot [/boot]
+
+Boot是在外部看是系统的顶层资源容器，在内部也是顶层组件（包含全部其他组件）。
+
+Boot用状态机描述，具有以下状态定义：
+
+1. `Probing`，在检查系统的所有存储设备；
+2. `ProbeFailed`，检查系统的存储设备时遇到错误；
+3. `Pending`，已检查系统的所有存储设备，在等待进行下一步的条件满足；
+4. `Presetting`，在执行预置任务（加盘操作等）；
+5. `Starting`，在启动应用；
+6. `Started`，应用已经启动；
+7. `Unavailable`，未发现可用磁盘卷，无法启动应用；
+8. `Initializing`，正在执行初始化任务；
+9. `Importing`，正在执行导入磁盘卷任务；
+10. `Repairing`，正在执行修复磁盘卷任务；
+
+**基础资源**
+
+Boot资源的基础属性如下，在任何状态下都具有这些属性：
+
+```json
+{
+  "state": "Probing",
+  "boundUser": {
+  },
+  "boundVolume": {
+  },
+  "preset": {
+  },
+  "storage": {
+  },
+  "device": {
+    "deviceSN": "string"
+    // 其他放在这里的cpus, mem等资源会移动到device api
+  }
+}
+```
+
+`boundUser`, `boundVolume`, `preset`三个属性均为从文件载入的数据对象；如果存在该设置则为一个JSON对象，如果不存在该设置，则为`null`。
+
+在系统启动时存在一个很短的时间客户端可能获得的Boot对象不具有`boundUser`, `boundVolume`, 或`preset`属性；在这种情况下客户端应该重新读取Boot资源。
+
+**boundUser**
+
+`boundUser`是设备绑定斐讯用户；目前仅定义了一个`phicommUserId`属性。
+
+```json
+{
+    "phicommUserId": "user id",
+}
+```
+
+**boundVolume**
+
+`boundVolume`是设备绑定的磁盘卷。该数据结构和`storage`对象是同构的，方便未来变更。
+
+```json
+{
+    "uuid": "磁盘卷的uuid",
+    "label": "磁盘卷的label，是空字符串",
+    "total": 1,
+    "usage": {
+        "system": {
+            "mode": "DUP",
+        },
+        "metadata": {
+            "mode": "DUP",
+        },
+        "data": {
+            "mode": "single"
+        }
+    },
+    "devices": [
+        {
+            "model": "硬盘型号",
+            "serial": "硬盘序列号",
+            "size": "磁盘容量，单位是块大小（512字节)",
+            "btrfsDevice": "btrfs卷为每个磁盘分配一个uuid，客户端不需要用",
+            "idBus": "在存储本数据时记录的该磁盘使用的总线，包括ata, usb等，可能会变，客户端不需要用",
+            "removable": "在存储本数据时记录的该磁盘是否可插拔，可能会变，客户端不需要用"
+        }
+    ]
+}
+```
+
+`total`属性是磁盘卷中的磁盘数量；`usage.data.mode`是磁盘卷的raid模式，可以是`single`或`raid1`；`devices`数组内是每个磁盘的信息。
+
+**preset**
+
+`preset`是预置任务；目前定义的预置任务只有加盘；该资源本身也是一个状态机描述。
+
+```json
+{
+    "state": "预置任务的状态",
+    "type": "volume",
+    "target": {
+    }
+}
+```
+
+预置任务的状态包括：
+1. `Pending`，等待执行；
+2. `Executing`, 正在执行任务；
+3. `Succeeded`, 任务已成功完成；
+4. `Failed`，任务执行失败（会通过其他属性陈述失败原因）；
+5. `Aborted`，被放弃执行（会通过其他属性陈述原因）；
+
+`type`是预置任务的类型，目前仅支持`volume`；
+
+`target`属性格式定义与**修改磁盘卷**操作定义的参数一致，且其中的设备名词均翻译成磁盘型号和序列号。例子：
+
+```json
+{
+    "devices": [
+        {
+            "model": "硬盘型号",
+            "serial": "硬盘序列号"
+        }
+    ],
+    "mode": "single"
+}
+```
+
+（该格式事实上是描述了经过操作之后boundVolume应该具有的磁盘和raid模式状态）。
+
+**Probing状态**
+
+该状态无其他资源，也无方法可以使用。
+
+**ProbeFailed状态**
+
+该状态增加如下属性：
+```json
+{
+    "code": "错误代码",
+    "message": "错误消息",
+    "timeout": 12345678,
+    "timerStartedAt": 12345678
+}
+```
+
+`ProbeFailed`状态具有一个时钟，`timeout`是时钟长度，`timerStartedAt`是时钟开始时间，两者相加就是该状态下一次迁移到`Probing`状态的时间（即重试）。
+
+**Pending状态**
+
+`Boot`在离开`Probing`状态后，可能进入`Pending`状态；进入`Pending`状态有三个可能的原因：
+
+1. `boundUser`尚未载入或者`boundUser`为`null`，即设备尚未绑定用户；如果设备尚未绑定用户，`Boot`会停留在`Pending`状态直至设备完成用户绑定；
+2. `boundVolume`尚未载入；
+3. `preset`尚未载入；
+
+只要三者全部载入且`boundUser`不是`null`，`Boot`会自动进入下一状态；
+1. 如果存在可用磁盘卷且存在尚未执行的预置任务，进入`Presetting`；
+2. 如果存在可用磁盘卷且不存在预置任务，或预置任务已经完成或被取消，进入`Starting`状态；
+3. 如果不存在可用磁盘卷，进入`Unavailable`状态。
+
+`Pending`状态下无增加属性。
+
+**Presetting状态**
+
+正在执行预置任务的状态。该状态会在`preset`对象内增加属性，描述正在执行的步骤和预估的用户等待时间；待详细定义。
+
+该状态不会在`Boot`对象内增加属性。
+
+**Starting状态**
+
+正在启动应用服务。
+
+该状态不会在`Boot`对象内增加属性。
+
+**Started状态**
+
+应用服务已经启动。
+
+该状态不会在`Boot`对象内增加属性。
+
+**Unavailable状态**
+
+该状态下不增加属性，但客户端开发者应理解为什么系统会进入该状态。
+
+进入该状态意味着离开`Pending`状态的条件已经满足，即设备已经载入了所有配置文件，且设备已经绑定了斐讯用户。
+
+停留在`Unavailable`状态的条件如下：
+
+1. 如果设备尚未绑定磁盘卷，即`boundVolume`为`null`，无法启动；
+2. 如果绑定磁盘卷未找到，即`Storage.volumes`资源内找不到`uuid`和`boundVolume.uuid`相同的磁盘卷，意味着绑定磁盘卷的硬盘均不存在（可能被移除，也可能插在设备上但接触不良或已经物理损坏）；
+3. 如果绑定磁盘卷可以找到，但存在缺失磁盘，即`Storage.volumes`资源内与`boundVolume.uuid`相同的磁盘卷的`missing`状态为`true`；
+4. 如果绑定磁盘卷可以找到，也不存在确实磁盘，但未能成功挂载，即`Storage.volumes`资源内与`boundVolume.uuid`相同的磁盘卷的`isMounted`为`false`（此时该资源具有`mountError`属性，可查看错误原因）；
+5. 如果绑定磁盘卷可以找到，但是磁盘卷上的用户文件未发现或者损坏，即`Storage.volumes`资源内与`boundVolume.uuid`相同的磁盘卷的`users`属性不是一个数组而是一个对象（包含错误信息的对象）；
+6. 如果绑定磁盘卷可以找到，对应的磁盘卷成功挂载且成功读取用户文件，但是该用户文件内的第一用户（`isFirstUser`为`true`的用户），其`phicommUserId`属性与`boundUser`的`phicommUserId`属性不一致，即磁盘卷上的管理员用户与设备绑定用户身份不一致；
+
++ 情况1用户可以选择初始化或者导入磁盘卷；
++ 情况2应告知用户失去的磁盘信息（`boundVolume`）；此时如果通过`Storage`资源发现设备上有其他磁盘或者磁盘卷，可以允许用户重新初始化或者导入；
++ 情况2应告知用户失去的磁盘信息（`boundVolume`）；此时如果通过`Storage`资源发现磁盘卷还有一块正常磁盘，可以允许用户尝试修复磁盘；
++ 情况3应告知用户失去的磁盘信息（`boundVolume`）；此时可以让用户执行修复操作，也可以允许用户重新初始化或者导入；
++ 情况4是一个运行时错误；除重启设备之外无其他建议操作，如果设备反复重启始终停留在该状态，属于服务器bug；客户端应该让用户可以读取`mountError`错误提交给开发者；
++ 情况5是用户文件损坏；能否尝试修复或者还原备份视错误代码而定（待详细定义）；
++ 情况6视业务要求而定（待详细定义）；
+
+**Initializing状态**
+
+该状态下不增加属性。
+
+系统在`Unavailable`状态时，客户端执行初始化操作，系统将迁移到`Initializing`状态执行初始化。
+
+**Importing状态**
+
+该状态下不增加属性。
+
+系统在`Unavailable`状态时，客户端执行导入磁盘卷操作，系统将迁移到`Importing`状态执行导入操作。
+
+**Repairing状态**
+
+该状态下增加属性。待定义。
+
+系统在`Unavailable`状态时，客户端执行修复磁盘卷操作，系统将迁移到`Repairing`状态执行修复操作。
+
+### 获取Boot资源 [GET]
+
+获取设备的`Boot`资源。该访问不要求客户端认证。
+
++ Response 200 (application/json)
+
+### 关机或重启 [PATCH]
+
+关机和重启操作视为修改`Boot.state`。
+
++ Request 关机 (application/json)
+
+            {
+                "state": "poweroff"
+            }
+
++ Response 200
+
++ Request 重启 (application/json)
+
+            {
+                "state": "reboot"
+            }
+
++ Response 200
+
+## 绑定磁盘卷 [/boot/boundVolume]
+
+以下API要求客户端提供token，仅限设备管理员访问。
+
+### 创建磁盘卷 [POST]
+
+创建磁盘卷视为创建`boot.boundVolume`属性。
+
+创建磁盘卷仅限`Unavailable`状态下执行，开始执行后首先进入`Initializing`状态，在该状态下会执行创建磁盘卷操作，挂载磁盘卷，创建必要的文件夹和文件，最终保存`boundVolume`至磁盘文件。
+
+过程中遇到任何错误，API会返回错误同时系统进入`Probing`状态重新检查存储。
+
+如果成功，API会返回成功，系统同样进入`Probing`状态，之后会经过`Starting`进入`Started`状态。
+
++ Request 创建磁盘卷 (application/json)
+
+            {
+                "target": ["sda", "sdb"],
+                "mode": "single"
+            }
+
++ Response 200
+
+### 导入磁盘卷 [PUT]
+
+导入磁盘卷视为设置`boot.boundVolume`属性。
+
+导入磁盘卷仅限`Unavailable`状态下执行，开始执行后首先进入`Importing`状态，在该状态下会直接保存`boundVolume`至磁盘文件。
+
+如果遇到错误，API会返回错误同时系统进入`Probing`状态重新检查存储。
+
+如果成功，API会返回成功，系统同样进入`Probing`状态，之后会经过`Starting`进入`Started`状态。
+
+***导入磁盘卷先决条件***
++ 当前boot状态为`Unavailable`
++ 当前storage中volumes含有一个或多个isMissing=false的磁盘卷
++ 符合条件的磁盘卷中的`users`数组中的必须有一个item的`isFirstUser`等于true 且它的phicommUserId必须与当前设备绑定用户一致
+
++ Request 导入磁盘卷 (application/json)
+
+            {
+                "volumeUUID": "volumd uuid"
+            }
+
++ Response 200
+
+## 修改磁盘卷 [PATCH]
+
+修复磁盘卷，添加磁盘的操作视为修改绑定磁盘卷属性。
+
+`devices`中的每个设备（盘）可以用两种方式提供，或者提供`name`，或者同时提供`model`和`serial`；这些信息可以从`storage`资源中获得；如果`name`, `model`, `serial`三者均提供，它们必须和`storage`中查询到的结果一致。
+
+`mode`可选提供，如果提供且与当前设置不一致，则视为希望在操作的同时修改磁盘的raid模式。
+
+如果当前绑定磁盘卷有磁盘缺失，此时操作视为修复；提供的参数必须把当前缺失的磁盘从`devices`列表中移除；如果参数检查正确，系统开始执行修复操作，`Boot`进入`Repairing`状态，API立刻返回。
+
+`Repairing`具有子状态机，尚未完成详细定义；但与创建或导入不同，`Repairing`状态无论成功还是失败，都不会自动离开该状态，需要客户端触发操作（API尚未定义）。
+
+减盘操作`remove`需要在正常启动后，也就是boot状态等于`Started`时才可以进行。
+
+加盘操作`add`需要在`Unavailable`状态，且boundVolume中包含的devices未完全包含设备中的blocks中的devices
+
+当设备增加一块新盘，且未添加到已有卷中时，设备启动会跳到`Unavailable`状态，此时需要用户做加盘操作，或者拔掉这块未使用磁盘重新启动
+
+***参数描述***
+```json
+{
+    "op":"repair", // "add", "remove"
+    "value": {
+        "devices":[
+            {
+               "name": "sda"
+            }
+        ],
+        "mode":"single"
+    }
+}
+```
++ 当op为repair时，参数devices中必须包含需要添加的磁盘(如果需要加盘修复)，且包含目前卷中残存的磁盘
++ 当op为add时, 参数devices中必须值包含需要添加的磁盘
++ 当op为remove时, 参数devices中必须只包含需要移除的盘,且mode不传,由于设备只包括两个盘位，意味着只能留下一块，只能为single
+
+
+***修复磁盘***
++ 初始状态为两盘组`single`, 一块盘坏: (此状态3个case未完成)
+    + 减去一块盘(坏掉的那块), `mode`不变,仍然为`single`
+    + 加上一块盘替换坏掉的那块, `mode`不变, 仍然为`single`
+    + 加上一块盘替换坏盘, `mode`改变, 为`raid1`
++ 初始状态为两盘组`raid1`, 一块盘坏: (此三种全部实现)
+    + 减去一块盘(坏点的那块), `mode`改变, 改为`single`
+    + 加上一块盘替换坏盘, `mode`不变，仍为`raid1`
+    + 加上一块盘替换坏盘, `mode`改变, 变为`single`
+    
+除去这六种case, 其他情况为不合法，不可修复,只能重新建卷
+
+***增加磁盘***
++ 当前boot状态为`Unavailable`
++ 当设备`boundVolume`的`devices`中只有一个元素，也就是当前卷只有一块盘的情况下可以执行
++ 当增加磁盘时, 磁盘卷的`mode`可以改变,也可以不变
+
+***删除磁盘***
++ 当前boot状态为`Started`
++ 当设备`boundVolume`的`devices`中含有两个元素，也就是设备当前卷有两块盘的时候可以删除一块
++ `mode` 不管之前两块盘是`raid1`还是`single`都会转为`single`
+
+
++ Request 修改磁盘卷 (application/json) 
+
+            {
+                op: 'repair',
+                value: {
+                    "devices": [
+                        {
+                            "name": "sda",
+                            "model": "硬盘型号",
+                            "serial": "硬盘序列号"
+                        }
+                    ],
+                    "mode": "single"
+                }
+            }
+
++ Response 200
+
++ Request 增加磁盘 (application/json) 
+
+            {
+                op: 'add',
+                value: {
+                    "devices": [
+                        {
+                            "name": "sdb"
+                        }
+                    ],
+                    "mode": "single"
+                }
+            }
+
++ Response 200
+
++ Request 删除磁盘 (application/json) 
+
+            {
+                op: 'remove',
+                value: {
+                    "devices": [
+                        {
+                            "name": "sdb"
+                        }
+                    ]
+                }
+            }
+
++ Response 200
+
+### 解绑定磁盘卷 [DELETE]
+
+body 中`format`参数为bool值,表示是否格式化磁盘
+
+body中`reset`参数为bool值,表示是否恢复到工厂模式
+
+执行此操作系统会重启
+
++ Request 解绑定磁盘 (application/json) 
+
+            {
+                "format": true,
+                "reset": true
+            }
+
++ Response 200
+
+## 获取绑定磁盘卷 [/boot/boundVolume/space]
+
+获取绑定磁盘卷的存储状态, 单位为KB
+
+### 获取绑定磁盘卷 [GET]
+
++ Response 200 (application/json)
+
+            {
+                "total": 1234,
+                "used": 1234,
+                "available": 1234
+            }
+
+# Group Device
+
+## 设备信息 [/device]
+获取设备信息, 包括:
+- 设备名称(可修改)
+- 设备型号 
+- 设备SN
+- CPU使用率 (/device/cpuInfo)
+- 内存使用率(/device/memInfo)
+- 当前网络情况
+- 硬件版本
+- 固件版本
+
+
+### 获取设备信息 [GET]
+
++ Response 200
+
+        {
+            "model": "PhiNAS2",
+            "sn": "1plp0panrup3jqpdd",
+            "swVersion": "1.0.0",
+            "hwVersion": "1.0.0"
+        }
+
+## 睡眠状态 [/device/sleep]
+
+###　获取睡眠状态 [GET]
+
+如果当前设置了睡眠模式,则返回设置的初试时间和结束时间，如果未设置睡眠模式，则返回空对象{}
+
++ Response 200
+
+        {
+            "start": "18:00",
+            "end": "8:00"
+        }
+
+### 设置睡眠模式 [PATCH]
+
+如果关闭睡眠模式，则只需要传`status`字段为false, 
+
+如果打开，则三个字段都要传
+
++ Request 修改睡眠模式
+
+        {
+            "status": true,
+            "start": "18:00",
+            "end": "8:00"
+        }
+
++ Response 200
+
+        {
+            "start": "18:00",
+            "end": "8:00"
+        }
+
+## CPU状态 [/device/cpuInfo]
+
+### 获取CPU状态 [GET]
+
++ Response 200
+
+        [ { 
+            model: 'Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz',
+            speed: 3699,
+            times: { 
+                user: 7750400,
+                nice: 54500,
+                sys: 27324300,
+                idle: 514531200,
+                irq: 0
+                } 
+            },
+        { 
+            model: 'Intel(R) Core(TM) i5-4590 CPU @ 3.30GHz',
+            speed: 3699,
+            times: { 
+                user: 7796000,
+                nice: 46400,
+                sys: 26431000,
+                idle: 261418400,
+                irq: 0 
+            }
+        }]
+
+## 内存使用 [/device/memInfo]
+
+#### 获取内存状态 [GET]
+
++ Response 200
+
+        {
+            "memTotal": "1015968 kB",
+            "memFree": "493200 kB",
+            "memAvailable": "680592 kB",
+            "buffers": "32320 kB",
+            "cached": "277680 kB",
+            "swapCached": "0 kB",
+            "active": "312632 kB",
+            "inactive": "141920 kB",
+            "activeAnon": "147524 kB",
+            "inactiveAnon": "2820 kB",
+            "activeFile": "165108 kB",
+            "inactiveFile": "139100 kB",
+            "unevictable": "3660 kB",
+            "mlocked": "3660 kB",
+            "swapTotal": "1046524 kB",
+            "swapFree": "1046524 kB",
+            "dirty": "108 kB",
+            "writeback": "0 kB",
+            "anonPages": "148268 kB",
+            "mapped": "85060 kB",
+            "shmem": "3372 kB",
+            "slab": "36868 kB",
+            "sReclaimable": "21640 kB",
+            "sUnreclaim": "15228 kB",
+            "kernelStack": "3456 kB",
+            "pageTables": "6068 kB",
+            "nFSUnstable": "0 kB",
+            "bounce": "0 kB",
+            "writebackTmp": "0 kB",
+            "commitLimit": "1554508 kB",
+            "committedAS": "756232 kB",
+            "vmallocTotal": "34359738367 kB",
+            "vmallocUsed": "0 kB",
+            "vmallocChunk": "0 kB",
+            "hardwareCorrupted": "0 kB",
+            "anonHugePages": "18432 kB",
+            "cmaTotal": "0 kB",
+            "cmaFree": "0 kB",
+            "hugePagesTotal": "0",
+            "hugePagesFree": "0",
+            "hugePagesRsvd": "0",
+            "hugePagesSurp": "0",
+            "hugepagesize": "2048 kB",
+            "directMap4k": "85952 kB",
+            "directMap2M": "962560 kB",
+            "speed": "1600 MHz",
+            "type": "DDR3"
+        }
+
+## 网速情况 [/device/speed]
+
+获取网络实时吞吐量，会返回一个网卡每秒吞吐的snipshot, 每个值都是网卡的累加的总值。
+
+这个数组最大长度为15，刚启动会出现不足15的情况，０值为最新一次的snipshot，依次递减，每个值之间相隔一秒
+
+### 获取当前网络吞吐 [GET]
+
++ Response 200
+
+        [
+            {
+                "receive": {
+                    "bytes": "14198340",
+                    "packets": "27470"
+                },
+                "transmit": {
+                    "bytes": "1069016",
+                    "packets": "7643"
+                }
+            },
+            {
+                "receive": {
+                    "bytes": "14197598",
+                    "packets": "27461"
+                },
+                "transmit": {
+                    "bytes": "1068454",
+                    "packets": "7637"
+                }
+            },
+            {
+                "receive": {
+                    "bytes": "14197598",
+                    "packets": "27461"
+                },
+                "transmit": {
+                    "bytes": "1068454",
+                    "packets": "7637"
+                }
+            },
+            {
+                "receive": {
+                    "bytes": "14197538",
+                    "packets": "27460"
+                },
+                "transmit": {
+                    "bytes": "1068454",
+                    "packets": "7637"
+                }
+            }]
+
+## 系统时间 [/device/timedate]
+
+### 获取系统时间 [GET]
+
++ Response 200
+
+        {
+            "Local time": "Fri 2018-06-08 15:03:21 CST",
+            "Universal time": "Fri 2018-06-08 07:03:21 UTC",
+            "RTC time": "Fri 2018-06-08 07:03:21",
+            "Time zone": "Asia/Shanghai (CST, +0800)",
+            "Network time on": "yes",
+            "NTP synchronized": "yes",
+            "RTC in local TZ": "no"
+        }
+
+## 网络设置 [/device/net]
+
+### 获取网络设置 [GET]
+
++ Response 200
+
+        [
+            {
+                "name": "enp0s3",
+                "address": "08:00:27:e3:c3:0c",
+                "mtu": 1500,
+                "speed": 1000,
+                "wireless": false,
+                "state": "up",
+                "ipAddresses": [
+                    {
+                        "address": "10.10.9.204",
+                        "netmask": "255.255.255.0",
+                        "family": "IPv4",
+                        "mac": "08:00:27:e3:c3:0c",
+                        "internal": false,
+                        "cidr": "10.10.9.204/24"
+                    },
+                    {
+                        "address": "fe80::4d75:8a09:dd08:646f",
+                        "netmask": "ffff:ffff:ffff:ffff::",
+                        "family": "IPv6",
+                        "mac": "08:00:27:e3:c3:0c",
+                        "scopeid": 2,
+                        "internal": false,
+                        "cidr": "fe80::4d75:8a09:dd08:646f/64"
+                    },
+                    {
+                        "number": 1,
+                        "address": "10.10.9.244",
+                        "netmask": "255.255.255.0",
+                        "family": "IPv4",
+                        "mac": "00:00:00:00:00:00",
+                        "internal": false,
+                        "cidr": "10.10.9.244/24"
+                    }
+                ],
+                "config": {
+                    "name": "enp0s3",
+                    "aliases": [
+                        "10.10.9.244/24"
+                    ]
+                }
+            }
+        ]
+
+### 创建IP别名 [POST]
+
+只有绑定用户可以创建，且只能创建一个
+
+如果已有别名，需先删除旧的
+
++ Request 
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
+    + Body
+
+            {
+                    "name": "enp0s3",
+                    "ipv4": "10.10.9.244",
+                    "mask": "24"
+            }
+
++ Response 200 (application/json)
+
+            [
+                {
+                    "name": "enp0s3",
+                    "aliases": [
+                        "10.10.9.244/24"
+                    ]
+                }
+            ]
+
+## 删除别名 [/device/net/{name}]
+
++ Parameters
+    + name: `enp0s3` - 网卡name
+
+### 删除别名 [DELETE]
+
++ Response 200
+
+# Group Users
+
+## 资源描述（系统）
+
+在斐讯N2中，系统内部对一个用户信息的完整定义是：
+
+```json
+{
+    "uuid": "系统会为每个用户自动分配一个uuid",
+    "username": "用于显示的用户名，目前缺乏定义",
+    "password": "用户的密码，以密文形式存储，使用bcrypt加密",
+    "smbPassword": "用户的Samba服务密码，以密文形式存储，按照Samba协议的要求加密",
+    "lastChangeTime": "数字类型，最后一次修改Samba密码的时间，Samba服务需要此字段",
+    "isFirstUser": "布尔类型，是否第一个用户（即管理员）",
+    "createTime": "数字类型",
+    "status": "枚举，ACTIVE, INACTIVE, DELETED",
+    "phicommUserId": "绑定的斐讯用户Id",
+    "phoneNumber": "绑定用户手机号"
+}
+```
+
+**uuid** 
+
+Fruitmix系统为每个用户自动分配一个本地标识；使用version 4 UUID格式，`a-f`字符必须为小写。
+
+**username**
+
+用于显示的用户名，目前缺乏详细的功能和合法性定义。
+
+字符串，最大长度不超过256字符（Unicode），不支持不可打印字符，包括回车，但允许空格。
+
+**password**
+
+用户的离线密码，以bcrypt格式密文存储，salt长度10；该属性不会提供给客户端。
+
+**smbPassword**
+
+md4格式的密文，按照phicomm设计，该密码不与password同步；该属性不会提供给客户端。
+
+**lastChangeTime**
+
+该字段为最后一次修改samba密码的时间，是smb服务需要的。
+
+**isFirstUser**
+
+布尔类型；仅第一个用户该值为true，表示它是系统内权限最高的管理员；其他所有用户该值为false。
+
+**createTime**
+
+自然数（含0），本地用户的创建时间。
+
+**status**
+
+字符串/枚举类型，表示用户的状态。合法值包括`ACTIVE`，`INACTIVE`，和`DELETED`；其中`ACTIVE`和`INACTIVE`的用户会向客户端返回；`DELETED`用户仅系统内部使用，不会返回给客户端。
+
+**phicommUserId**
+
+该本地用户绑定的斐讯用户Id。
+
+**phoneNumber**
+
+该本地用户绑定的手机号
+
+## 持久化
+
+用户信息数据结构持久化在`users.json`文件内。
+
+> 测试时可以直接用符合格式要求的文件替换该文件，但应注意与`drives.json`文件保持一致，同步替换。
+
+## 资源描述（API）
+
+在客户端访问时，api返回两种用户信息：基础信息和详细信息，视用户访问权限而定。
+
+基础信息包括如下属性：
+
+1. uuid
+2. username
+3. isFirstUser
+4. createTime (new)
+5. status (new)
+6. phicommUserId
+7. phoneNumber (new)
+
+详细信息包括如下属性：
+
+1. uuid
+2. username
+3. isFirstUser
+4. createTime (new)
+5. status (new)
+6. phicommUserId 
+7. password (true or false)，true表示此用户设置了离线密码；
+8. smbPassword (true or false)，true表示此用户设置了Samba密码；
+9. phoneNumber (new)
+
+## 列表 [/users]
+
+### 获取用户列表 [GET]
+
+本API接受匿名访问或JWT Token。
+
+如果访问者是匿名用户，或者访问者提供了JWT的身份认证但是普通用户身份，API返回所有用户的基础信息。
+
+如果访问者提供了JWT的身份认证且是管理员，API返回所有用户的详细信息。
+
+0615更新: 不区分是否匿名，统一返回详细信息
+
++ Request 匿名 (~)
+
++ Response 200 (application/json)
+    + Attributes (array[TUserFull])
+
+
++ Request 普通用户
+    + Headers
+
+            Authorization: JWT JWT_AUTH_STRING
+
++ Response 200 (application/json)
+    + Attributes (array[TUserFull])
+
++ Request 管理员
+    + Headers
+
+            Authorization: JWT JWT_AUTH_STRING
+
++ Response 200 (application/json)
+    + Attributes (array[TUserFull])
+
+### 创建新用户 [POST]
+
+仅管理员可以访问该操作，需提供：
+
+1. username（UI上称昵称）
+2. phicommUserId，客户端通过邀请码从云上获得该信息
+3. phoneNumber, 客户端通过用户输入获得
+
+初始创建的用户没有离线密码，用户可以经过云访问用户password资源设置密码；
+
+客户端如果远程访问此API，应先确认是否在线。
+
++ Request
+
+        {
+            "username": "昵称",
+            "phicommUserId": "phicommUserId",
+            "phoneNumber": ""
+        }
+
++ Response 200 (application/json)
+    + Attributes (TUserFull)
+
+## 单例 [/users/{uuid}]
+
++ Parameters
+    + uuid: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - user uuid
+
+### 获取用户信息 [GET]
+
++ Request
+    + Headers
+
+            Authorization: JWT JWT_AUTH_STRING
+
++ Response 200 (application/json)
+    + Attributes (TUserFull)
+
+### 修改用户信息 [PATCH]
+
+修改用户信息有如下业务目的：
+
+1. 修改密码和
+2. 修改其他信息，包括`username`，`status`, `phoneNumber`, `smbPassword`
+3. 但不允许同时1&2，返回400.
+
+修改 `password`:
+* 在本地访问时，修改password, 该API使用HTTP Basic Auth，需要用户提供原有的离线密码，等于新密码换旧密码
+* 在本地访问时，该API使用HTTP Basic Auth，需要用户提供原有的离线密码，等于新密码换旧密码。
+* 在远程访问时，走远程认证，无须提供原有离线密码，`password`和`smbPassword`如果提供*。
+* 只有自己能够修改自己的密码
+* `encrypted` 字段为布尔值，用来描述提供的password是否已加密
+
+修改用户信息:
+* 本地访问时, 使用JWT Token Auth, 远程访问，无需Token
+* `status`字段目前只有管理员可以修改, 管理员的`status`任何人不可修改
+* `username`不可与已有用户重复
+* `phoneNumber`不可与已有用户重复
+* `smbPassword`
+
++ Request 修改用户信息
+
+        {
+            "username": "新昵称",
+            "status": "INACTIVE",
+            "phoneNumber": "12233332222",
+            "smbPassword": "smb password string"
+        }
+
++ Response 200 (application/json)
+
++ Request 修改密码
+
+        {
+            "password": "new password string",
+            "encrypted": false 
+        }
+
++ Response 200
+
+
+# Group Token
+
+客户端在直接访问NAS时，获取Token有两种方式：
+
+1. 使用用户的本地UUID和密码直接使用本API获取token；
+2. 使用云提供的station pipe api从云端获取token；该情况尚未定义。
+
+无论哪种情况，token的能力一致，且都由station签发和决定超时逻辑；两种方式仅视为获取token的通讯通道不同。
+
+## Token单例 [/token]
+
+### 获取Token [GET]
+
+本API要求使用HTTP Basic Authentication。
+
++ Response 200 (application/json)
+
+    + body
+
+            { 
+                "type": "JWT",
+                "token": 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiOWY5M2RiNDMtMDJlNi00YjI2LThmYWUtN2Q2ZjUxZGExMmFmIn0.83z5kzghi7R8FGumxsKoXAtM6RlrthDFceI3_ryRPSs' 
+            }
+
+
+## Token验证 [/token/verify]
+
+### Token验证 [GET]
+
+本API为测试API，不承诺长期稳定维护。该API不符合Restful设计，但在单元测试范围内。
+
+使用JWT认证调用本API，如果token有效返回HTTP 200；否则返回401错误。
+
++ Response 200
+
+
+# Group Drives
+
+## 描述
+
+Drive资源表述用户拥有的虚拟盘。
+
+系统中定义了两种虚拟盘，分别称为私有盘和共享盘。
+
+私有盘在内部资源表述如下：
+
+```json
+{
+    "uuid": "系统为每个盘分配一个uuid",
+    "type": "private",
+    "owner": "user uuid",
+    "tag": "home",
+    "label": "",
+    "smb": true
+}
+```
+
+盘的`tag`属性为内部使用，目前每个用户有且仅有一个私有盘`tag`都是`home`。未来也许会允许一个用户有多个私有盘，用不同的tag区分用途。
+
+公有盘在内部资源表述如下：
+
+```json
+{
+    "uuid": "系统为每个盘分配一个uuid",
+    "type": "public",
+    "writelist": ["user uuid"],
+    "readlist": ["user uuid"],
+    "label": "显示给用户的盘名称",
+    "tag": "",
+    "smb": true
+}
+```
+
+`writelist`为用户uuid的数组，表示哪些用户对此盘具有写权限。
+
+`readlist`暂未使用，该数组永远为空。
+
+`label`是提供给客户端显示的名称，该名称也用于Samba显示。
+
+`tag`同样为内部使用，每个系统缺省有一个`tag`为`built-in`的共享盘，不可删除。
+
+`smb`表示此盘是否samba可见
+
+## 列表 [/drives]
+
+### 获取虚拟盘列表 [GET]
+
+返回用户可以访问的虚拟盘；包括用户的私有盘和所有可以访问的共享盘。
+
++ Request
+    + Headers
+
+            Authorization: JWT_JWT_AUTH_STRING
+
++ Response 200 (application/json)
+    + Attributes (array)
+        + (TPrivateDrive)
+        + (TPublicDrive)
+        + (TBackupDrive)
+
+### 创建虚拟盘 [POST]
+
+仅管理员可以执行该操作。
+
++ Request 公共盘
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
+    + body
+
+            {
+                "writelist": ["dd8b6213-f495-4001-9846-cbeeab4f8adb"],
+                "label": "label"
+            }
+
++ Response 200 (application/json)
+    + Attributes (TPublicDrive)
+
++ Request 备份盘
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
+    + body
+
+            {
+                "op": "backup",
+                "label": "iphone X",
+                "client": {
+                    "id": "12112111",
+                    "type": "1",
+                    "other": "test"
+	            }
+            }
+            
++ Response 200 (application/json)
+    
+        {
+            "uuid": "uuid string",
+            "type": "backup",
+            "label": "iphone x",
+            "owner": "dd8b6213-f495-4001-9846-cbeeab4f8adb",
+            "smb": "true",
+            "ctime": "",
+            "mtime": "",
+            "client": {
+                "id": "12112111",
+                "type": "1",
+                "other": "test"
+            }
+        }
+
+
+## 单例 [/drives/{driveUUID}]
+
++ Parameters
+    + driveUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - drive uuid
+
+### 获取一个虚拟盘 [GET]
+
++ Response 200 (application/json)
+
+### 更新一个虚拟盘 [PATCH]
+
+公共盘仅管理员可更新, 可更新的属性包括：
+1. writelist
+2. label
+3. smb
+
+私有盘仅自己可更改， 可更新属性包括:
+1. label
+2. smb
+
+备份盘可修改属性
+1. label
+2. client
+
++ Response 200 (application/json)
+
+### 删除一个虚拟盘 [DELETE]
+
+只能删除公共盘， 且只有管理员可操作
+
++ Response 200 (application/json)
+
+## 清空用户数据 [/drives/{driveUUID}/dirs/{dirUUID}]
+
+### 清空用户数据 [PACTH]
+
+用以清空单个用户磁盘所有用户数据
+
+强制driveUUID必须等于dirUUID
+
++ Request (application/json)
+
+            {
+                "op": "format"
+            }
+
++ Response 200
+
+## 单个文件夹 [/drives/{driveUUID}/dirs/{dirUUID}{?metadata}]
+
+该API返回单个文件夹的两个属性：
+1. `path`是文件夹的路径，采用对象路径的方式（object path），而不是名称路径（name path）；客户端可以自行提取name path用于显示；
+2. `entries`是文件夹的内容，包括文件夹对象和文件对象；
+
+客户端可以使用`metadata`参数，如果`metadata`为`true`，会为每个文件增加`metadata`属性，客户端可以用该属性显示图片。
+
++ Parameters
+    + driveUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - drive uuid
+    + dirUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - directory uuid
+    + metadata: true (boolean, optional) - if provided as true, entry will contain metadata
+
+### readdir [GET]
+
+Originally list-nav api. Now is default for GET.
+
+There is no structural information in either `path` or `entries` array.
+
++ Response 200 (application/json)
+
+            {
+                "path": [
+                    {
+                        "uuid": "directory uuid",
+                        "name": "directory name",
+                        "mtime": 1234
+                    }
+                ],
+                "entries": []
+            }
+
+## DirEntry List [/drives/{driveUUID}/dirs/{dirUUID}/entries]
+
+There is no separate GET api for `entries`.
+
++ Parameters
+    + driveUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - drive uuid
+    + dirUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - directory uuid
+
+### writedir [POST]
+
+该API用于实现所有文件操作。
+
+受限于文件系统和HTTP资源描述差异，该API不是严格的Restful设计；同时考虑到批量文件操作和传输时的效率问题，该API支持批处理操作。
+
+该API仅接受`multipart/form-data`类型（https://www.ietf.org/rfc/rfc2388.txt），使用自定义的私有协议。协议如下：
+
+formdata中的每个part，称为一个job，对应请求一个文件操作所需的所有参数和数据。
+
+定义两种不同的job：`field` job用于不包含上传文件数据的操作请求，`file` job用于包含上传文件数据的请求操作。
+
+`field` job使用part的`name` directive和body，但不得提供`filename` directive；`file` job使用part的`name`和`filename` directive，和body；服务器使用是否具有`filename` directive区分两种job类型。
+
+`name`用于提供被操作的文件夹或文件名；绝大多数文件操作都只一个一个文件夹或文件名；如果一个操作需要两个名字，例如`rename`，两个名字放在一起，用`|` (vertical bar)分割，例如：`hello|world`。
+
+在服务器端所有操作都被认为需要两个名字，`fromName`和`toName`，如果一个操作只需要一个名字，`fromName`和`toName`是一样的，`fromName`和`toName`会出现在API的返回结果中。
+
+`field` job使用part body装载其他参数，是一个JSON数据格式，是否有换行和缩进不重要。
+
+`file` job使用`filename`装载其他参数，是一个JSON数据格式，不应该有换行、缩进和不必要的空格，body留给了上传的文件数据。
+
+客户端上传时每个part是顺序到达服务器的，但服务器的执行顺序可能并发，依赖于每个任务的执行时间和文件名称。
+
+如果任务A在任务B的前面，且任务A的`toName`和任务B的`fromName`一样，任务A称为任务B的前置任务，即任务B需要操作的文件是任务A需要先执行操作或者操作后产生的。
+
+在服务器端，一个操作任务可以执行的最早时间是它没有前置任务或者前置任务都已经完成；没有前置任务或者前置任务已经完成的任务都会并发执行。
+
+例如下面的操作序列：
+
+```
+1. mkdir hello      // 立刻开始执行
+2. mkdir hello      // 1 结束后立刻开始执行
+3. newfile world    // 立刻开始执行，这个任务可能在2之前开始
+4. append world     // 3 结束后开始执行
+5. append world     // 4 结束后开始执行
+6. rename world foo // 5 结束后开始执行
+7. remove foo       // 6 结束后开始执行
+8. remove bar       // 立刻开始执行
+9. mkdir bar        // 8 结束后开始执行
+```
+
+当服务器遇到第一个任务错误后，所有正在执行的操作都会被抛弃（除非该任务已经进入最后一个无法中断的底层文件操作步骤）。由于并发操作的存在，很常见看到前面的操作失败但是后面的操作成功的情形。
+
+如果任务在解析multipart/formdata之前即存在其他HTTP错误，例如用户无权访问文件夹，服务器按照HTTP约定返回错误。
+
+只要任务可以开始执行，服务器只会返回200或者207。如果任务全部成功，返回200；如果部分或全部失败，返回207。
+
+在返回200或者207时，在返回的body里包含一个JSON格式的数组，数组里每个元素对应每个part请求任务的参数和执行结果，顺序和part的发送顺序一致。
+
+如果任务成功，它包含一个`data`字段，字段内容视操作类型而定，在绝大多数情况下是被操作文件的`xstat`，也可能是null（例如删除操作）。
+
+如果遇到错误，它包含一个`error`字段，内部包含`status`, `code`, `message`，其中`status`可能是：
+
+1. 400 请求的参数非法 
+2. 403 权限或规则错误，或者取消操作，但参数无问题
+3. 404 资源不存在
+4. 500 其他执行错误
+
+例如：
+
+```json
+[ 
+    { 
+        "op": "newfile",
+        "name": "logo.png",
+        "size": 6218,
+        "sha256": "41675ab4824be9e389a846be1c97da2d53d28d93f87560282d7da02747d48790",
+        "data": { 
+            "uuid": "2dfc39ec-91e0-4e7a-a0f9-3dc112f8c013",
+            "type": "file",
+            "name": "logo.png",
+            "mtime": 1524549022995,
+            "size": 6218,
+            "magic": "PNG",
+            "hash": "41675ab4824be9e389a846be1c97da2d53d28d93f87560282d7da02747d48790"
+        } 
+    },
+    {
+        "op": "newfile",
+        "name": "WISNUC-1.3.15.dmg",
+        "size": 79246760,
+        "sha256": "8fd24ee1f72c5a01261f233ce7359a5f48804fdf5e76af7f5c1c4c0e613f1f7a",
+        "error": { 
+            "status": 403,
+            "code": "EEXIST",
+            "message": "file already exists",
+        }
+    }    
+]
+```
+
+#### mkdir （新建文件夹）
+
+> **api变更** 
+> 1. 取消`parents`参数，使用`policy`。
+
+使用field格式。
+
+`name`为需要创建的文件夹名称。
+
+`body`格式：
+
+```json
+{
+    "op": "mkdir",
+    "policy": [null, null]
+}
+```
+
+`policy`是可选属性，如不提供，缺省为[null, null]；如提供，必须是合法的policy格式；
+
+对应`mkdir -p`的配置是`["skip", null]`，即遇到同名文件夹跳过且返回该文件夹的`xstat`。
+
+#### remove
+
+`remove`操作采用幂等性设计，如果目标不存在，视为成功，返回200。
+
+使用field格式。
+
+`name`为需要删除的文件或文件夹名称。
+
+`body`格式：
+
+```json
+{
+    "op": "remove",
+    "uuid": "可选提供的目标文件或文件夹UUID"
+}
+```
+
+`uuid`字段可选提供；目前服务器不处理该字段；使用该字段可以处理同名不同实例的竞争情况，对于用户操作不需要考虑这种情况（因为用户认为名字就是Identifier）。
+
+#### rename
+
+> **api变更** 
+> 1. 取消`overwrite`参数，使用`policy`。
+
+使用field格式。
+
+`name`为需要重命名的文件或文件夹名称，用`|`（vertical pipe）符号分隔；例如：`oldName|newName`；
+
+`body`格式：
+
+```json
+{
+    "op": "rename",
+    "policy": [null, null]
+}
+```
+
+`policy`为可选字段，如不提供，缺省为`[null, null]`。
+
+#### dup (file only)
+
+暂未实现
+
+Field. Two different names must be provided in `name` field, separated by vertical pipe (`|`). `value` is a json object.
+
+If `overwrite` is not provided:
++ `fromName` must be a regular file. Otherwise, the operation fails.
++ `toName` must not exist. Otherwise, the operation fails.
+
+If `overwrite` is provided:
++ `fromname` must be a regular file. Otherwise, the operatoin fails.
++ `toName` must be a regular file. Otherwise, the operation fails.
++ `toName` file must have the given uuid. Otherwise, the operation fails.
++ after operation, the `toName` file will reserve the given uuid.
+
+```js
+{
+    "op": "dup",
+    "overwrite": "TARGET_FILE_UUID" // optional
+}
+```
+
+#### newfile (<=1GB)
+
+> **api变更** 
+> 1. 需要提供`op`属性，值为`newfile`；之前的api无此属性；
+> 2. 取消`overwrite`字段，使用`policy`；不需要客户端提供目标文件的UUID。
+
+创建一个新文件。
+
+使用`file`格式；
+
+`filename`格式：
+```json
+{
+    "op": "newfile",
+    "size": 1234,
+    "sha256": "SHA256_HASH_STRING",
+    "policy": [null, null],
+    "bfilename": "aaa.json",
+    "bctime": 152555555555,
+    "bmtime": 158888888888
+}
+```
+
++ `op`必须，且为字符串`newfile`
++ `size`必须，类型为数值，取值范围：0 <= size <= 1G
++ `sha256`必须为sha256字符，
++ `bfilename`, `bctime`, `bmtime` 目前只用于backup目录下文件
+
+size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 1024 * 1024），超过1G的文件应该用newfile和append组合操作完成。
+
+原来使用`overwrite`的逻辑，可以用`["replace", null]`实现。
+
+#### append file (<=1GB)
+
+> **api变更** 
+> 1. 需要提供`op`属性，值为`append`；之前的api无此属性；
+> 2. 取消`append`字段；不需要客户端提供目标文件的UUID。
+
+在目标文件后面添加数据块。
+
+使用file格式。
+
+`filename`格式：
+```json
+{
+    "op": "append",
+    "hash": "目标文件append操作之前的hash (fingerprint)",
+    "size": 1234,
+    "sha256": "数据块的sha256",
+}
+```
+
+目标文件的大小必须为1GB的整数倍，包括0；添加的数据块大小不超过1GB，且不得为0。
+
+参数合法性遵循以下规则，否则返回400；
+
++ 所有属性必须提供；
++ `name`必须是合法文件名，由sanitize包提供检验；
++ `hash`必须是合法的SHA256字串；
++ `size`为大于0小于等于1GB的整数，包含1GB，不包含0；
++ `sha256`必须是合法的SHA256字串；
++ 目标文件的hash必须和参数提供的hash一致；
+
+
+#### archive
+
+用于归档backup目录下某文件或文件夹
+
+用途： 当客户端发现用户删除本地文件/文件夹，就需要把nas对应文件/文件夹标注为archive, 下次restore不主动恢复
+
+```javascript
+{
+    "op": "archive"
+}
+```
+
+#### delete
+
+用于用户操作删除`backup`drive 下 文件或文件夹
+
+只用于用户在客户端主动操作，其他客户端备份删除行为，同正常`classic drive`操作相同
+
+用途：
++ 用户对backup下文件操作只有删除操作，在客户端使用此方法删除
++ 此方法删除后对应文件/文件夹位置会放置空的同类型同名文件，并在属性标注为deleted
++ 当下次客户端备份时发现该文件，不主动备份本地已有同名文件
+
+```javascript
+{
+    "op": "delete"
+}
+```
+
+#### addTags
+
+Field. `name` is a file name. `value` is a json object.
+
+This function will attach tags to this file
+
+```js
+{
+    "op": "addTags",
+    "tags": "tagId array"
+}
+```
+
+#### removeTags
+
+Field. `name` is a file name. `value` is a json object.
+
+This function will remove tags from this file
+
+```js
+{
+    "op": "removeTags",
+    "tags": "tagId array"
+}
+```
+
+
++ Request mkdir (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="hello"
+            
+            {"op":"mkdir"}
+            --BOUNDARY--
+
++ Response 200 
+
++ Request remove (multipart/form-data, boundary=BOUNDARY)
+    + Body
+
+            --BOUNDARY
+            content-disposition: form-data; name="hello"
+            
+            {"op":"remove"}
+            --BOUNDARY--
+
++ Response 200
+
++ Request rename (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="~$foo|foo"
+
+            {"op":"rename"}
+            --BOUNDARY--
+
++ Response 200
+
++ Request dup (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="foo|bar"
+            
+            {"op":"dup"}
+            --BOUNDARY--
+
++ Response 200
+
++ Request new file (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="foo"; filename="{"size":FILE_SIZE,"sha256":"SHA256_HASH_STRING"}"
+            
+            xxxxxx-file-content-xxxxxx
+            --BOUNDARY--
+
++ Response 200
+
++ Request append (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="foo"; filename="{"size":CHUNK_SIZE,"sha256":"SHA256_HASH_STRING","append":"FINGERPRINT_STRING"}"
+            
+            xxxxxx-file-content-xxxxxx
+            --BOUNDARY--
+
++ Response 200
+
++ Request batch (multipart/form-data, boundary=BOUNDARY)
+    
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="hello"
+            
+            {"op":"mkdir"}
+            --BOUNDARY
+            content-disposition: form-data; name="empty"; filename="{"size":0}"
+
+            --BOUNDARY
+            content-disposition: form-data; name="foo"; filename="{"size":FILE_SIZE,"sha256":"SHA256_HASH_STRING","overwrite":true}"
+            
+            abcd
+            --BOUNDARY
+            content-disposition: form-data; name="partial"; filename="{"size":FILE_SIZE,"sha256":"SHA256_HASH_STRING"}"
+
+            xxxxxx
+            --BOUNDARY--
+
++ Response 200
+
++ Request addTags (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="hello"
+            
+            {"op":"addTags", "tags":[1, 4]}
+            --BOUNDARY--
+
++ Response 200
+
++ Request removeTags (multipart/form-data, boundary=BOUNDARY)
+    + Body
+            
+            --BOUNDARY
+            content-disposition: form-data; name="hello"
+            
+            {"op":"removeTags", "tags":[1, 4]}
+            --BOUNDARY--
+
++ Response 200
+
+## DirEntry [/drives/{driveUUID}/dirs/{dirUUID}/entries/{entryUUID}{?name}]
+
++ Parameters
+    + driveUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - drive uuid
+    + dirUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - directory uuid
+    + entryUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - uuid of this entry
+    + name: `filename` - file or directory name
+
+### Download a file [GET]
+
++ Request rename
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
++ Response 200 (application/octet-stream)
+
+# Group Files
+
+> 20180608 
+> 1. 全部接口逻辑和参数格式确定，如果需求无变化不再变更
+> 2. 以下内容中endi, ende, namepath这三个api参数未支持，不影响当前需求实现
+> 3. 文件类型未支持音频和文档，会在下周一之前完成
+
+File API接口是提供文件查询（query）接口，支持多种查询条件，可以组合使用条件，通过query string传递检索参数。
+
+File API提供两种查询方式：按照时间序查询和按照文件系统结构序（以下简称结构序）查询。
+
+时间序查询仅能查到系统预定义类型的文件和有tag的文件。结构序查询可以查询到所有文件。
+
+
+1. 按照时间序查询
+
+**order**
+
+order指定了查询结果的排序方式，同时也指定了是使用时间序查询还是结构序查询。
+
+```
+order=newest,oldest,find
+```
+
+`newest`为时间逆序查询；`oldest`是时间正序查询；`find`是结构序查询。
+
+order可以不提供，如果不提供；缺省为`newest`。
+
+> 注意：在用户界面上有时显示的是搜索，但实际API调用仍然是查询。
+
+**sequence & range**
+
+在使用范围查询（range query）时，对于时间序和结构序，使用的起终点（boundary）格式不同；
+
+> 在服务器端的角度看，开始点实际上是一个position的表述；服务器端不要求该position一定存在，如果position不存在，服务器会根据预先定义的顺序找到下一个元素继续查询。
+
+时间序索引按照以下规则对符合索引条件的文件对象进行排序（相当于两级组合键排序）：
+
+1. 先按照文件的时间戳排序；时间戳的类型是数字；
+2. 对于时间相同的文件再用文件的UUID字符串排序；
+
+在使用range查询时，起点和终点需结合使用，格式为`time.uuid`。
+
+时间序的range查询支持正序逆序，支持起终点的inclusive/exclusive逻辑，uuid也可以不提供，系统会自动补齐。
+
+在使用时间序的range查询时，使用的参数是`starti`, `starte`, `count`, `endi`, `ende`，详见参数说明。
+
+结构序是文件系统的结构顺序，排序分为3级：
+
+1. 客户端提供的places序；
+2. 使用depth-first/previsit处理层级结构；
+3. 同一级目录中的内容，按照文件夹优先，然后是文件的字母序排列（大小写敏感）；
+
+在使用range查询时，places条件是必须提供的参数；起点的表述格式为`index.type.namepath`，其中：
+
+1. index是places条件的index；
+2. type是起点的类型；
+3. namepath是一个相对路径的字符串，含义是相对指定index的place（一定是dir）的相对路径；
+
+结构序的range查询仅支持正序，仅支持起点+count的方式，仅支持exclusive逻辑。
+
+在使用结构序查询时，使用的参数是`last`和`count`，详见参数说明。
+
+**starti & starte**
+
+starti和starte是在时间序查询时使用的参数。
+
+```
+starti=1528260514783.d00b3fa8-4028-41dd-8f72-e69a9cd6768d
+starte=1528260514783.d00b3fa8-4028-41dd-8f72-e69a9cd6768d
+
+如果不提供uuid字串：
+
+newest first（逆序）查询时
+starti=1528260514783，相当于
+starti=1528260514783.ffffffff-ffff-4fff-ffff-ffffffffffff （包含该时间的全部文件）
+starte=1528260514783，相当于
+starte=1528260514783.00000000-0000-4000-0000-000000000000 （不包含该时间的全部文件）
+
+
+oldest first（正序）查询时
+starti=1528260514783，相当于
+starti=1528260514783.00000000-0000-4000-0000-000000000000 （包含该时间的全部文件）
+starte=1528260514783，相当于
+starte=1528260514783.ffffffff-ffff-4fff-ffff-ffffffffffff （不包含该时间的全部文件）
+
+```
+
+range查询的习惯设计是`[start, end)`方式，`start`使用`inclusive`逻辑，`end`使用`exclusive`逻辑，遵循数学上Interal的表述习惯。
+
+该设计对于从某个日期开始查询很友好，但是在连续使用count查询时，客户端会希望每次使用上一次查询的最后结果做起点，使用`exclusive`逻辑继续查询。
+
+所以服务器端支持`starti`和`starte`两个参数，分别表示`start`是`inclusive`还是`exclusive`逻辑；避免客户端自己实现UUID string的递增1递减1逻辑（很麻烦）。
+
+`starti`和`starte`都是可选提供；如果提供应该只提供一个，如果两个都提供，`starti`生效。
+
+如果未提供start，查询从最新的文件开始。
+
+如果是从newest first开始连续多次请求实现分段逻辑，首次请求应不提供start参数，只提供count参数；
+
+如果返回的文件数量等于count，可以用最后一个文件属性的mtime和uuid组合，使用starte参数继续请求，直至获得的返回结果少于count要求。
+
+**last**
+
+在使用结构序查询时，使用last参数表述查询起始点；last参数分为3级，分别表述place index，path的类型，和path string；
+
+```
+suppose places=4e20cfa8-e7f1-44fe-91f6-69ca01aa18e9.115eb786-e787-4381-9411-463dca3ec8e1
+last=1.directory.foo
+
+or
+
+last=1.file.foo/alonzo church.jpg
+last=1.file.foo%2Falonzo%20church.jpg (uri encoded)
+```
+
+如上例所示：
+
+1. place index为自然数（含0），是places的index；上例中的1表示uuid=115eb786-e787-4381-9411-463dca3ec8e1的文件夹
+2. path type是字符串枚举，仅支持`directory`和`file`
+3. path string是路径字符串，示例中的`foo`或`foo/alonzo church.jpg`
+
+> 服务器需要类型参数是因为前述结构序定义是先文件夹后文件的，如果客户端提供的last未找到，此时已经无法获知下一个节点的定义应该是文件夹还是文件；
+
+该值可以从上一次查询的结果的最后一条获得。无论客户端是否提供namepath=true的参数，最后一条返回结果都会提供该参数。
+
+**count**
+
+```
+count=50
+```
+
+count结合`start`或`last`使用，表示所需返回结果数量。如果返回的结果数量不足客户端指定数量，意味着查询已经完成。
+
+`count`是可选提供，如果不提供等于是把服务器的所有用户可访问的内容都dump下来，在文件数量巨大的时候服务器很可能因为内存不够crash；未来会加以限制。
+
+TODO: 在客户端使用find且未提供types或者tags时应该对count的最大值做限制。
+
+**endi, ende**
+
+暂不支持。
+
+对于时间序查询，`end`是另一种表述结束点的方式。结构序查询不支持end参数，如果提供会被忽略。
+
+和`start`一样，`end`分为`endi`和`ende`，分别表示`inclusive`和`exclusive`逻辑。`endi`和`ende`如果提供应该只提供一个，如果都提供，`ende`生效。
+
+客户端可以只使用`count`，只使用`end`，或者结合使用两者，结合使用时`count`和`end`条件是OR关系。
+
+`count`和`end`都是可选提供，如果都不提供，会遍历整个索引给出全部符合其他查询条件的结果。
+
+**places**
+
+```
+places=4e20cfa8-e7f1-44fe-91f6-69ca01aa18e9.115eb786-e787-4381-9411-463dca3ec8e1
+```
+
+places是一组uuid，用dot (`.`)分隔；
+
+每个uuid表示一个文件夹，如果要搜索整个drive，可以提供drive uuid，表示drive的根文件夹；
+
+places必须提供，且不得重复；
+
+如果提供的places具有嵌套关系，对于时间序查询没有影响；对于结构序查询，嵌套的places会重复查询，服务器不做去重处理；
+
+按照当前产品定义，在客户端尽量遵循下述要求传递places参数：
+
+1. 只传递一个place，可以是drive也可以是dir
+2. 如果传递多个place，最好都是drive
+
+**class & types**
+
+```
+class=image
+types=JPEG.PNG.GIF
+```
+
+`types`是一组字符串，每个字符串是文件类型，例如`JPEG`；多个type之间用dot (`.`)分隔；
+
+`types`可选提供，如果不提供则不检查文件类型；
+
+`class`是预定义的一组types，如果提供了`class`，`types`参数会被忽略。
+
+`class`的合法值包括：
+
++ image
++ video
++ audio
++ document
+
+对应的types为：
+
++ image: JPEG, PNG, GIF, TIFF, BMP
++ video: RM, RMVB, WMV, AVI, MPEG, MP4, 3GP, MOV, FLV, MKV
++ audio: RA, WMA, MP3, OGG, MKA, WAV, APE, FLAC
++ document: DOC, DOCX, XLS, XLSX, PPT, PPTX, PDF
+
+产品定义中的RAW格式图片目前无法支持，TXT文档格式暂时无法支持。
+
+**tags**
+
+```
+tags=1.2.5
+```
+
+tags是一组tag id，是用户自定义的tag，用dot (`.`)分割；
+
+tags可选提供，如果不提供则不检查文件的tag；
+
+每个tag之间是AND关系，即返回的每个文件必须包含所有tag
+
+按照phicomm N2的产品定义，tag查询仅对用户私有盘有效，对公共盘无效；
+
+**name**
+
+```
+name=foo
+```
+
+name是一个字符串，现阶段的定义是，如果提供name，则返回文件的文件名必须包含该name；目前不支持regex搜索，仅支持字符串的包含关系；
+
+有可能区分name和ext（扩展名）
+
+**fileOnly**
+
+```
+fileOnly=true
+```
+
+该参数仅在使用`order=find`且没有提供`types`和`tags`参数时生效，因为在提供types或tags参数时已经过滤掉了所有的文件夹。
+
+如果未提供types和tags参数时仍然想只搜索文件结果，可以使用该参数过滤掉所有文件夹。
+
+**其他**
+
+服务器不强制要求count，但是如果客户端不提供count，意味着拿到符合要求的结果全集，在文件数量庞大时有可能导致服务器长时间block，甚至可能造成服务程序因内存不足crash。
+
+## 列表 [/files{?order,starti,starte,last,count,places,class,types,tags,name,fileOnly}]
+
++ Parameters
+    + order: newest (optional) - sort order
+    + starti: `1528260514783.d00b3fa8-4028-41dd-8f72-e69a9cd6768d` (optional) - time.uuid
+    + starte: `1528260514783.d00b3fa8-4028-41dd-8f72-e69a9cd6768d` (optional) - time.uuid
+    + last: `1.foo/alonzo church.jpg` - iterator for query ordered by structure
+    + count: 500 (number, optional) - positive integer
+    + places: `dd8b6213-f495-4001-9846-cbeeab4f8adb` (string) - directory uuid (may also be a drive uuid)
+    + class: image, video, audio, document (enum, optional) - shortcut for types
+    + types: JPEG.PNG.BMP.GIF (string, optional) - type or type list, separated by dot
+    + tags: 1.2 (string, optional) - tag or tag list, separated by dot
+    + name: foo (string, optional) - name search
+    + fileOnly: true (boolean, optional)
+
+### 获取列表 [GET]
+
++ Response 200 (application/json)
+    + Attributes (array)
+        + (QFile)
+        + (QDirectory)
+
+## 单例 [/files/{fileUUID}]
+
++ Parameters
+    + fileUUID: `dd8b6213-f495-4001-9846-cbeeab4f8adb` - file uuid
+
+### GET
+
+目前暂未提供该API
+
+该API设计允许客户端使用fileUUID直接获得文件内容；
+
+目前实现上对于有文件类型或者有tag的文件是OK的，但是对于没有这两者，仅通过name参数查询到的文件，因为内部无索引，所以暂时无法支持。
+
+该问题在考虑解决办法，如果内部数据结构不增加全部文件索引的话，拟在搜索API中为这种文件提供`parent`属性，为文件所在文件夹的uuid，这样客户端可以用drive api获取该文件。
+
++ Response 404 (application/octet-stream)
+
+# Group Tags
+
+(新资源）
+
+一个tag资源表示一个用户建立的文件分类。用户可以赋予每个文件资源一个或多个tag属性；也可以在索引系统中根据tag浏览文件。
+
+文件资源中记录的tag属性，在数据结构上以引用方式实现，方便用户修改tag的显示名称和颜色。
+
+在资源范围上，tag资源是全局资源，它不受容器（`Drive`）限制；在授权访问上，所有认证用户都可以读取、创建、修改和删除所有tag资源，没有细粒度的权限控制。
+
+按照上述设计，文件在移动和复制时不会丢失tag。
+
+一个tag资源的描述如下：
+
+```json
+{
+    "id": 0,
+    "name": "a non-empty human-readable name",
+    "color": "a html color codes, such as #232323"
+}
+```
+
+
+
+## 列表 [/tags]
+
+返回所有tag资源。
+
+### 获取列表 [GET]
+
++ Response 200 (application/json)
+
+        [
+            {
+                "id": 0,
+                "name": "name string",
+                "color": "html color codes, in format of #232323"
+            }
+        ]
+
+### 创建新资源实例 [POST]
+
+创建新的tag资源，客户端必须提供`name`属性，可选提供`color`属性；
+
+name不得为空，最大长度64字符；color必须是合法的`#232323`格式；
+
++ Request 
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
+    + Body
+
+            {
+                "name": "宝宝照片",
+                "color": "#232323"
+            }
+
++ Response 200 (application/json)
+
+            {
+                "id": 0,
+                "name": "宝宝照片",
+                "color": "#232323"
+            }
+
+## 单例 [/tags/{tagId}]
+
++ Parameters
+    + tagId: 0 - tag id
+
+
+### 读取 [GET]
+
+读取一个tag资源。
+
++ Response 200 (application/json)
+
+        {
+            "id": 0,
+            "name": "宝宝照片",
+            "color": "#232323",
+        }
+
+### 更新 [PATCH]
+
+更新一个tag资源。采用Merge逻辑，数据结构要求和创建tag资源一致；返回更新后的tag资源。
+
++ Request
+    + Headers
+
+            Authorization: JWT_AUTH_STRING
+
+    + Body
+
+            {
+                "name": "宝宝照片",
+                "color": "#232323",
+            }
+        
++ Response 200 (application/json)
+
+        {
+            "id": 0,
+            "name": "宝宝照片",
+            "color": "#232323",
+        }
+
+
+### 删除 [DELETE]
+
+删除一个tag资源。
+
++ Response 200
+
+# Group Media
+
+## Media List [/media]
+
+Media资源汇集了设备内的所有多媒体文件；与file api不同，media api使用media文件的hash/fingerprint作为文件的唯一标识（identifier）。
+
+与file uuid相比，使用hash/fingerprint作为文件标识具有更好的稳定性，它对文件系统的结构性变更免疫，包括文件的移动和重命名。
+
+客户端应考虑在业务中，用户对多媒体文件使用是否关心其在文件系统上的位置；如果用户关心文件在文件系统上的位置，应该使用file api完成业务，否则可以使用media api。
+
+在media api中，不关心文件在文件系统中有多少个副本，因此media api的返回结果相当于file api的结果去重，或者把内容相同的文件都group在一起。
+
+在使用上，file api是作为一个查询逻辑使用的，即客户端在服务器的海量数据集里取出一部分陈列给用户；推荐采用递增式的查询为用户提供视图。
+
+对于media api，首先用户通常不关心它在文件系统的位置，包括文件名；其次，它需要多次查询，首先载入metadata显示placeholder，然后载入缩略图。
+
+在这种情况下，对api的使用应使用数据库同步模型，即客户端一次性拿到所有media的metadata并且在本地保存，且对于获取过的thumbnail，在本地建立cache。
+
+因为通过hash标识多媒体文件，文件内容和metadata都是不变量，这是和其他类型文件的本质不同。
+
+例如对于一个word文档而言，用户的认知是放在某个文件夹下的某个文件名的文件是**同一个**文件，不管这个文件内容发生了什么变化，所以不能以文件内容的hash作为文件标识。
+
+> 从数据结构的角度说，这个区别是特别重要的，它指的是对于一个数据对象的标识，是by name的还是by value的。Media API的实现是by value的，File API的实现是by name的。
+
+### Media列表 [GET]
+
+返回用户有权限访问的所有media文件的metadata。
+
++ Response 200 (application/json)
+
+        [
+            {
+                "hash": "529e471a71866e439d8892179e4a702cf8529ff32771fcf4654cfdcea68c11fb",
+                "m": "JPEG",
+                "w": 4624,
+                "h": 2608,
+                "orient": 1,
+                "datetime": "2017:06:17 17:31:18",
+                "make": "Sony",
+                "model": "G3116",
+                "lat": "31/1, 10/1, 506721/10000",
+                "latr": "N",
+                "long": "121/1, 36/1, 27960/10000",
+                "longr": "E",
+                "size": 4192863
+            }
+        ]
+
+## Media单例 [/media/{fingerprint}{?alt,width,height,modifiers,autoOrient}]
+
++ Parameters
+    + fingerprint: 529e471a71866e439d8892179e4a702cf8529ff32771fcf4654cfdcea68c11fb - media file finger print
+    + alt (enum[string], optional) - alternative type, if not provided, defaults to metadata
+        + Members
+            + metadata
+            + data
+            + thumbnail - if alt=thumbnail, either width or height must be provided.
+            + random - 返回一个随机id （长达160字节）
+
+    + width (number, optional) - thumbnail width
+    + height (number, optional) - thumbnail height
+    + modifiers (enum[string], optional) - imagemagick convert modifier
+        + Members
+            + caret - fill the area, if used, both width and height must be provided
+    + autoOrient (optional) - rotate image automatically according to exif orientation
+
+### Get Media metadata, data, or thumbnail [GET]
+
+Media单例接口提供根据Media文件的`fingerprint`，获取文件的下述内容：
+
+1. metadata 
+2. 缩略图
+3. 原文件
+4. 随机URL
+
+**获取media文件的metadata**
+
+符合restful url定义，实际上没有业务需要用。
+
+
+> GET /media/xxxx
+>
+> GET /media/xxxx?alt=metadata
+
+**获取media文件的缩略图**
+
+参数采用了`imagemagick`的参数格式，支持：
+
+1. height: 高度
+2. width: 宽度
+3. modifier: 目前仅支持caret，可撑满给定区域
+4. autoOrient: 根据exif的orientation属性自动调整方向
+5. vthumb: 仅针对视频文件，如果vthumb为true，返回视频前15秒的缩略图视频，mp4格式
+
+> 20180620 autoOrient参数对视频文件类型无效
+
+`imagemagick`的auto orient不是总能获得正确结果，该问题目前无解，只能等imagemagick升级。
+
+服务器对客户端使用多大尺寸的缩略图没有假设，但是计算过的缩略图都会有cache；
+
+当客户端请求到达时，服务器首先检查cache中是否有已经使用同样参数生成过的缩略图，如果有可以立刻返回；如果没有会开始生成。
+
+生成缩略图是比较耗费CPU资源的操作，服务器端对该过程进行排队和调度。
+
+对于客户端而言，对于用户已经划出屏幕显示区域的缩略图请求，合理的做法是放弃请求，服务器会把所有客户端放弃的生成缩略图请求调度到最低优先级，在没有正在服务的请求时加以计算。
+
+如果客户端能够如上所述放弃暂时不需要的缩略图请求，有助于服务器更快的计算当前客户端需要的缩略图，提升客户端载入的反应速度；客户端不这样做也没有特别的影响，最终客户端发出的请求服务器都会一一返回。
+
+
+> GET /media/xxxx?alt=thumbnail&width=160
+>
+> GET /media/xxxx?alt=thumbnail&height=160
+>
+> GET /media/xxxx?alt=thumbnail&width=160&height=160
+>
+> GET /media/xxxx?alt=thumbnail&width=160&height=160&modifier=caret
+>
+> GET /media/xxxx?alt=thumbnail&width=160&autoOrient=true
+>
+> GET /media/xxxx?alt=thumbnail&height=160&autoOrient=true
+>
+> GET /media/xxxx?alt=thumbnail&width=160&height=160&autoOrient=true
+>
+> GET /media/xxxx?alt=thumbnail&width=160&height=160&modifier=caret&autoOrient=true
+
+**下载原始文件**
+
+> GET /media/xxxx?alt=data
+
+**使用random id下载原始文件**
+
+> GET /media/{160字节的random id}
+
+**获得文件的random id**
+
+> GET /media/xxxx?alt=random
+
+
+
++ Request metadata
+    + Parameters
+        + alt: `metadata` - can be omitted
+
++ Response 200 (application/json)
+
+        {
+            "m": "JPEG",
+            "w": 4624,
+            "h": 2608,
+            "orient": 1,
+            "datetime": "2017:06:17 17:31:18",
+            "make": "Sony",
+            "model": "G3116",
+            "lat": "31/1, 10/1, 506721/10000",
+            "latr": "N",
+            "long": "121/1, 36/1, 27960/10000",
+            "longr": "E",
+            "size": 4192863
+        }
+
+
++ Request data
+    + Parameters
+        + alt: data
+
++ Response 200 (application/octet-stream)
+
++ Request thumbnail
+    + Parameters
+        + alt: thumbnail
+
++ Response 200 (application/octet-stream)
+
++ Request random
+    + Parameters
+        + alt: random
+
++ Response 200 (application/json)
+
+        {
+            "random": "一个长度160字节的[0-9][a-f]字符串"
+        }
+
+# Group PhyDrives
+
+## 描述
+
+`PhyDrives`资源表示的是系统的物理盘，是Windows意义上的盘，例如C盘，D盘等，技术上这个盘概念的准确称谓是文件系统（file system）。
+
+系统中的盘资源实际上是从`storage`数据结构中提取出来的，一个文件系统可以是：
+
+1. 一个btrfs磁盘卷，无缺失磁盘；
+2. 一个无分区表，只有文件系统的物理磁盘；Windows上格式化移动硬盘或者U盘会创建这样的文件系统；
+3. 位于一个磁盘分区上的文件系统，可以是主分区或者逻辑分区；
+
+满足上述要求的文件系统，如果成功挂载，且不是系统正在使用的bound volume，可以在`phy-drives`里显示。
+
+目前系统的设计里不限制接口形态，即SATA接口和USB接口的硬盘上的文件分区都包含。
+
+目前支持的文件系统包括：btrfs, ntfs, ext4, fat32/exFAT。其他文件系统类型不支持，不会出现在盘的列表里。
+
+## 物理盘列表 [/phy-drives{?usage}]
+
+该列表实际上是`storage`资源中具有文件系统且已经挂载的且允许所有用户访问的块设备列表。
+
+标识符可以是设备名，例如sda或者sda1，或者btrfs卷的uuid。客户端想获取其物理设备信息或文件系统信息可以查询`storage`资源。
+
+支持的文件系统仅限fat32, exfat, ntfs, ext3/ext4和btrfs。
+
+普通用户仅可访问USB的外置设备。管理员用户可以访问USB外置设备和内部（ATA）的非绑定磁盘卷的其他磁盘卷，或者非磁盘卷的硬盘上的文件系统。
+
++ Parameters
+    + usage: true - 是否同时返回每个盘的usage, 此处usage单位为KB
+
+
+### 获取物理盘列表 [GET]
+
++ Request 无uage
+    + Headers
+
+            Content-Type: ~
+
++ Response 200 (application/json)
+    + Attributes (array[TPhyDrive])
+
+
++ Request 有usage
+    + Headers
+
+            Content-Type: ~
+
++ Response 200
+    + Attributes (array[TPhyDriveUsage])
+
+## 访问物理盘文件系统 [/phy-drives/{id}{?path,name,last,count}]
+
++ Parameters
+    + id: sda (required) - 块设备名或者卷UUID
+    + path: 'hello/world' (required) - 路径
+    + name: 'hello' (optional) - 提供name时理解为搜索
+    + last: `directory.foo/bar` - 
+    + count: 50 (number, optional)
+
+### 读取文件夹或者下载文件，搜索文件和文件夹 [GET]
+
+**读取文件夹**
+
+返回文件类型可以是`file`, `directory`, `symlink`, `socket`, `fifo`, `char`, `block`, 或者`unknown`。
+
+此处显示特殊类型文件的目的是让使用者理解名字冲突的原因。文件操作仅对`file`和`directory`有效；符号链（symlink）暂不支持。
+
+**搜索文件夹**
+
+搜索时除提供`id`和`path`参数外，还需要提供`name`, `last`，和`count`参数；其中`name`必须提供，`last`和`count`可选。
+
+last参数的格式和files接口相似，但不需要提供place index；格式为：
+
+```
+${type}.${path}
+```
+
+其中`type`可以是`file`或`directory`，全部小写（大小写敏感）。
+
+URL示例：
+
+```
+/phy-drives/sda?path=hello/world&name=ar&count=50
+/phy-drives/sda?path=hello/world&name=ar&last=directory.foo/bar&count=50
+
+# or encoded:
+
+/phy-drives/sda?path=hello%2Fworld&name=ar&count=50
+/phy-drives/sda?path=hello%2Fworld&name=ar&last=directory.foo%2Fbar&count=50
+```
+
++ Request listdir
+    + Headers
+
+            Content-Type: ~
+
++ Response 200 (application/json)
+
+            [
+                {
+                    "name": "hello",
+                    "type": "directory",
+                    "size": 0,
+                    "ctime": 1499321290925
+                },
+                {
+                    "name": "world",
+                    "type": "file",
+                    "size": 0,
+                    "ctime": 1499321294161
+                }
+            ]
+
++ Request search in dir
+    + Headers
+
+            Content-Type: ~
+
++ Response 200 (application/json)
+
+            [
+                {
+                    "type": "directory",
+                    "name": "bar",
+                    "namepath": ["foo", "bar"]
+                },
+                {
+                                {
+                    "type": "file",
+                    "name": "tar",
+                    "namepath": ["foo", "file1.tar.gz"]
+                }
+            ]
+
++ Request downfile
+    + Headers
+
+            Content-Type: ~
+
++ Response 200
+
+#### 创建新文件夹或文件 [POST]
+
+该API使用multipart/form-data；通过name字段定义了三种part：prelude, directory, 和file。
+
+通过云访问时需要提供prelude part，包含id和path属性；通过JSON格式的body传输。prelude字段必须是第一个part。
+
+创建一个文件夹使用directory part；name是directory，body是新建文件夹名称，utf8编码的字符串。
+
+创建一个文件使用file part；name是file，filename是文件名，body是文件内容。Content-Type不做约定，一般客户端的库会自动判断文件内容并选择合适的Content-Type。
+
++ Request 批量创建新文件夹和文件 (multipart/form-data, boundary=---------------------------9051914041544843365972754266)
+
+        -----------------------------9051914041544843365972754266
+        Content-Disposition: form-data; name="prelude"
+
+        {"id":"sdb1","path":"hello"}
+        -----------------------------9051914041544843365972754266
+        Content-Disposition: form-data; name="directory"
+
+        新建文件夹名称
+        -----------------------------9051914041544843365972754266
+        Content-Disposition: form-data; name="file"; filename="新建文件名称"
+        Content-Type: application/octet-stream
+
+        文件内容 00112233445566778899AABBCCDDEEFFGG
+        -----------------------------9051914041544843365972754266--        
+
++ Response 200
+
+#### 重命名 [PATCH]
+
+重命名不使用query string，使用json body传递参数。
+
+客户端须提供`oldPath`和`newPath`参数，均必须是合法路径，且不得为空。
+
+> 服务器内部使用OS的rename api，如果无特殊原因，该api可以用任何类型的文件覆盖任何类型的文件。如果客户端不希望这种行为，联系开发者。
+
+**返回**
+
++ 200 成功
++ 404 id未找到
++ 400 oldPath, newPath参数非法
++ 403 操作错误，错误码符合Linux文件系统定义
++ 500 服务器异常
+
+弹出USB设备重用了这个api,当`body`中含有`op`字段则视为操作弹出usb设备, `op`必须等于`eject`
+
++ Request (application/json)
+    + Parameters
+        + id: 'sdd'
+
+    + body
+
+            {
+                "oldPath": "hello/world",
+                "newPath": "foo/bar"
+            }
+
++ Response 200
+
++ Request 弹出USB (application/json)
+    + Parameters
+        + id: 'sdd'
+
+    + body
+
+            {
+                "op": "eject"
+            }
+
++ Response 200
+
+#### 删除文件夹或文件 [DELETE]
+
+`path`指定的目标可以是文件、文件夹、和特殊文件类型。
+
+`path`必须提供且不得为空。
+
+该api采用幂等性设计。如果目标不存在，视为成功；例如：删除`hello/world`时，如果`hello`文件夹不存在或者`world`不存在时均返回成功。
+
+> 但按照Linux文件系统约定，如果`hello`存在但不是文件夹，此时返回`ENOTDIR`错误，http返回403。
+
+**返回**
+
++ 200 成功
++ 404 id未找到
++ 400 path非法，未提供，或者为空字符串
++ 403 操作错误，客户端可检查错误代码
++ 500 服务器异常
+
++ Response 200
+
+# Group Tasks
+
+> 20180619
+> 1. 支持的任务类型增加至8种
+> 2. 原import/export任务名称更改为icopy/ecopy
+>
+> 20180710
+> 1. 增加batch模式的复制移动任务
+
+Task设计为代表用户完成一个复杂的文件操作，目前Task没有持久化设计，在服务程序重启时所有Task都被中断和抛弃，无法恢复。
+
+目前支持四种Task类型：
+
+1. `copy`，在Fruitmix文件系统中复制文件和文件夹；
+2. `move`，在Fruitmix文件系统中移动文件和文件夹；
+3. `icopy`，从物理盘向Fruitmix文件系统复制文件和文件夹；
+4. `imove`，从物理盘向Fruitmix文件系统移动文件和文件夹； 
+5. `ecopy`，从Fruitmix文件系统向物理盘复制文件和文件夹；
+6. `emove`，从Fruitmix文件系统向物理盘移动文件和文件夹；
+7. `ncopy`，从物理盘向物理盘复制文件和文件夹；
+8. `nmove`，从物理盘向物理盘移动文件和文件夹；
+
+在Fruitmix文件系统内的移动、复制、剪切/粘帖文件和文件夹的业务通过Task接口完成。在物理盘中目前没有这些业务支持。
+
+Task在服务器端使用组合状态机实现。
+
+目前设计中支持客户端：
+
+1. 可以创建一个任务；
+2. 随时观察任务状态；
+3. 修改遇到命名冲突的子任务的命名冲突解决策略；
+4. 修改全局的命名冲突策略；
+5. 删除一个任务；
+
+目前设计中不支持：
+
+1. 查看文件任务的进度；
+2. 暂停和恢复一个任务；
+
+**子任务**
+
+子任务分为文件任务和文件夹任务，每种任务具有不同的状态。
+
+客户端开发者可以不了解全部状态，只理解在GET请求中得到的子任务列表里会用到的子任务类型和状态；
+
+API测试者需要了解全部状态，Task API支持专门为测试设计的单步执行模式（stepping）和暴露内部状态机的更多状态；
+
+文件任务的内部状态包括：
+
++ `Working` - 正在复制或移动状态
++ `Conflict` - 遇到命名冲突，等待用户解决
++ `Failed` - 失败
++ `Finish` - 成功
+
+文件夹任务的内部状态包括：
+
++ `Mkdir` - 正在创建目标文件夹
++ `Conflict` - 建立目标文件夹时遇到命名冲突，等待用户解决
++ `Preparing` - 执行一连串的准备工作，读取源文件下的所有内容，在目标文件夹批量创建其中的目录，然后进入`Parent`或`Finish`状态；
++ `Parent` - 目标文件夹已经建立，正在等待子任务完成；
++ `Failed` - 失败
++ `Finish` - 成功
+
+在非单步模式下，客户端能看到的任务包括：
+
+1. 处于冲突状态的文件或文件夹
+2. 处于`Working`状态的文件
+
+在单步模式下，客户端还可以看到：
+
+1. 处于`Mkdir`，`Preparing`和`Parent`状态下的文件夹任务；
+
+无论文件还是文件夹，在客户端都不应观察到`Failed`和`Finish`状态；如果观察到该状态说明内部状态机出现错误。
+
+> 外部访问状态机是异步的，设计上文件和文件夹任务的`Failed`和`Finish`状态仅用于同步迁移。
+
+**单步**
+
+单步模式仅用于测试目的。应用开发者可以完全忽略单步行为。
+
+使用单步模式创建的任务，在开始时位于停止状态；客户端需要用step操作让状态机走一步，然后用watch操作观察状态机的单步执行结果。
+
+TODO：补充单步模式的状态和调度逻辑
+
+**View**
+
+我们把客户端观察到的状态机描述称为view。数据结构定义如下：
+
+```json
+{
+    "uuid": "d10cc095-7089-4f0f-9607-0ec288604c0d",
+    "src": {
+      "drive": "237fd4e3-656b-4eb2-a31d-1af6a65503e5",
+      "dir": "e098f04a-768b-4980-915e-0ea57166023f"
+    },
+    "dst": {
+      "drive": "237fd4e3-656b-4eb2-a31d-1af6a65503e5",
+      "dir": "60ec0aa3-f5c1-47e6-a6f5-b3e0470ed4d5"
+    },
+    "entries": [
+      "foo",
+      "bar"
+    ],
+    "nodes": [],
+    "finished": true,
+    "error": null
+
+    "stepping": true,
+    "steppingState": "Stopped",
+
+    "finished": {
+        fileCount: 23,
+        dirCount: 12
+    },
+    "failed": [],
+  }
+```
+
+以下为运行状态描述
+
+- uuid - 随机创建的Task uuid
+- src - 创建文件时客户端提供的源文件夹描述
+- src.drive - 源文件夹的drive标识，对于Fruitmix文件系统是drive uuid，对于物理盘是物理盘的id（btrfs uuid或者device name）
+- src.dir - 源文件夹的标识，对于Fruitmix文件系统是dir uuid，对于物理盘是相对路径
+- dst.drive - 目标文件夹的drive标识，格式同src.drive
+- dst.dir - 目标文件夹的标识，格式同src.dir
+- entries - 位于源文件夹内需要复制或移动的文件或文件夹名称，字符串数组，不得为空
+- nodes - 状态机执行时，外部可操作的内部任务列表，每个node的格式下述
+- finished - bool值，表述整个任务是否已经完成
+- error - null或JSON对象，表述是否具有全局性的错误，全局性错误包括：
+    - 用户失去对源文件夹或者目标文件夹的访问权限
+    - 源文件夹无法访问
+    - 目标文件夹无法访问
+- stepping - bool值，表述是否处于单步模式
+- steppingState - 字符串枚举，`Stopped`或者`Stepping`；该属性仅在stepping模式下有；
+
+以下为统计结果描述
+
+- finished - 完成的子任务
+- finished.fileCount - 移动或复制的文件数量
+- finished.dirCount - 新建的文件夹数量
+- failed - 失败任务列表
+
+error的数据结构
+
+```json
+待定义
+```
+
+**正在执行的子任务（node）**
+
+在内部的所有子任务构成tree结构，客户端得到的view中的nodes是在tree上使用深度优先的previsit方式线性化的数据结构。
+
+每个子任务具有一个src；src的含义是该子任务的源文件夹或源文件；src的uuid也用作该子任务的uuid标识；
+
+对于文件夹任务，node数据结构中会提供一个dst，表示对应的目标文件夹标识，该属性客户端可以忽略，无实际用途；
+
+在任务的src是物理盘时，此时源文件和文件夹并没有存储在磁盘上的uuid，Task模块会随机为其分配一个；
+
+```json
+{
+    "type": "directory",
+    "parent": "e098f04a-768b-4980-915e-0ea57166023f",
+    "src": {
+        "uuid": "d10866f1-6890-44af-8e69-efe45f65dbfc",
+        "name": "foo"
+    },
+    "dst": {
+        "uuid": "2e06631a-d151-4f5b-ab9f-0125746e08b0",
+        "name": "foo"
+    },
+    "policy": [],
+    "state": "Parent"
+    },
+    {
+    "type": "file",
+    "parent": "e098f04a-768b-4980-915e-0ea57166023f",
+    "src": {
+        "uuid": "4b03440d-2d5a-4f66-bdae-5afa07ec1b61",
+        "name": "bar4"
+    },
+    "policy": [],
+    "state": "Working"
+}
+```
+
+- type - 子任务类型，`directory`或`file`
+- parent - 父任务（一定是文件夹任务）的uuid标识
+- src - 源文件夹或文件标识，其uuid属性也作为该子任务的uuid标识
+- dst - 目标文件夹或文件标识，可忽略
+- policy - 该子任务的policy
+- state - 子任务状态，与子任务类型有关，见前述
+
+**失败的子任务**
+
+暂定格式如下：
+
+```json
+{
+    "uuid": "2e06631a-d151-4f5b-ab9f-0125746e08b0",
+    "namepath": "hello/world",
+    "code": "ENOTDIR",
+    "xcode": "EUNSUPPORTED",
+    "message": "not a dir"
+}
+```
+
+**错误情况与结果统计**
+
+第一个问题是Task的可能遇到的错误情况非常多（但几率非常低）；需要的统计结果也需要根据应用进行调整。以下是可能需要考虑的情况：
+
+1. 在任务启动时，遇到客户端提供的顶层任务的源文件夹或文件不存在
+2. 非顶层任务的源文件或文件不存在，这是在Task读取了源文件夹之后，执行具体的操作之前，用户手工删除了该文件或文件夹所致
+3. 非顶层任务的源文件或文件发生了类型变化，这是在Task读取了源文件夹之后，执行具体的操作之前，用户手工删除了原来的文件或文件夹，然后重新手工建立同名文件夹或文件所致
+4. 在任务执行时，源文件夹发生变化，导致已经创建的子文件夹或文件任务批量失败
+5. 在任务执行时，目标文件夹发生变化，导致已经创建的子文件夹或文件任务批量失败
+
+这些情况中通常可以忽略错误继续执行，但是否需要单列列表供用户查看，待定。
+
+第二个问题是Task支持命名冲突解决策略，通过策略自动解决的命名冲突包括以下情况：
+
+1. skip策略生效的情况，自动跳过，视为成功
+2. merge策略生效的情况，混合了文件夹
+3. replace策略生效的情况，发生覆盖
+4. rename策略生效的情况，发生自动重命名
+
+以上情况是否计入finish count，是否单列列表供用户查看，待定。
+
+**批处理任务**
+
+批处理任务用于客户端从以下内容中执行多个文件和文件夹的复制移动任务：
+
+1. 分类文件
+2. 在fruitmix文件系统中的搜索结果
+3. 在native文件系统（phy-drive）中的搜索结果
+
+其中情况1仅包含文件，情况2/3可能包含文件夹和文件。
+
+在服务器端，批处理任务采用顺序执行方式依次针对每个entry创建copy/move任务；所创建的任务内嵌在该批处理任务中，即在任务列表中不会单列一个entry的任务。
+
+整个批处理任务使用一个uuid。
+
+在批处理任务创建每个子任务时，强制采用如下policies；该设置保证复制或移动过程中对客户端而言无须处理任何命名冲突。
+
+```js
+{
+    dir: ['rename', 'rename'],
+    file: ['rename', 'rename']
+}
+```
+
+创建批处理任务时所需参数如下：
+
+```json
+{
+    "batch": true,
+    "type": "ecopy",
+    "dst": {
+        "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+        "dir": "305d8beb-566d-4cf1-b7dd-b28dc2161fc1"
+    },
+    "entries": [ 
+        {
+            "drive": "sdd",
+            "dir": "hello/world",
+            "name": "alonzo.jpg"
+        }
+    ],
+}
+```
+
+和标准任务比，批处理任务增加了`batch`参数，需为`true`；不提供`src`参数；`entries`参数为一个对象数组，其中每个对象包含drive, dir, name三个字段。
+
+对于fruitmix文件系统的文件或文件夹，drive和dir是uuid，对于phy-drive里的文件夹，drive是drive id，dir是路径。
+
+批处理任务的视图如下：
+
+```js
+{
+    uuid: '95ceb6b5-13a6-44ad-841d-2d3effedfcb2',
+    batch: true,
+    type: 'copy',
+    entries: [ 
+        { 
+            drive: '68367b35-d127-464e-a968-17c04b1f27f8',
+            dir: '1c97ecd3-e4ad-424c-8d1f-c501a5faccfa',
+            name: 'alonzo.jpg' 
+        } 
+    ],
+    dst: { 
+        drive: '8eb65663-59cd-4098-b74c-7123ff14d8a1',
+        dir: '8eb65663-59cd-4098-b74c-7123ff14d8a1' 
+    },
+    current: {
+        src: { 
+            drive: '68367b35-d127-464e-a968-17c04b1f27f8',
+            dir: '1c97ecd3-e4ad-424c-8d1f-c501a5faccfa' 
+        },
+        entries: [ 'vpai001' ],
+        nodes: [ [Object] ],
+        finished: false,
+        stepping: false 
+    },
+    allFinished: false 
+}
+```
+
+其中entries字段是客户端发送的任务列表中尚在排队的部分，服务器每次从该列表中取走一个entry，创建对应的执行任务，该执行任务的描述在`current`属性中。
+
+`current`对象的属性和单一任务一致，但移除了`uuid`, `type`, `dst`字段。
+
+在所有任务完成后，allFinished设置为true。
+
+## 任务列表 [/tasks]
+
+### 列出任务列表 [GET]
+
+返回所有用户自己创建的任务view；view的数据结构见上所述。
+
++ Response 200 (application/json)
+
+        []
+
+### 创建新任务 [POST]
+
+```json
+{
+    "type": "copy",
+    "src": {
+        "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+        "dir": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee"
+    },
+    "dst": {
+        "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+        "dir": "305d8beb-566d-4cf1-b7dd-b28dc2161fc1"
+    },
+    "entries": [ 
+        "foo",
+        "bar"
+    ],
+}
+```
+
+- type - 任务类型，字符串，目前支持`copy`, `move`, `icopy`, `imove`, `ecopy`, `emove`, `ncopy`, `nmove`
+- src - 源文件夹对象
+- src.drive - 源文件夹所在盘，如果是Fruitmix文件系统，为drive uuid，如果是物理盘，是物理盘id；
+- src.dir - 源文件夹标识，如果是Fruitmix文件系统，为dir uuid，如果是物理盘，是物理盘的相对路径，与phy-drives api约定一致；
+- dst.drive - 目标文件夹所在盘，格式与src.drive一致；
+- dst.dir - 目标文件夹标识，格式与dst.dir一致；
+- entries - 字符串数组，不得为空；
+
+在创建任务时不提供Policy选项，任务的Policy更新只可以通过Patch单个冲突任务的`policy`完成，更新全局policy只能通过在Patch单个冲突任务的`policy`时提供`applyToAll`参数完成。
+
++ Request copy (application/json)
+
+        {
+            "type": "copy",
+            "src": {
+                "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+                "dir": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee"
+            },
+            "dst": {
+                "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+                "dir": "305d8beb-566d-4cf1-b7dd-b28dc2161fc1"
+            },
+            "entries": [ 
+                "foo",
+            ],
+        }
+
++ Response 200 (application/json)
+
+        { 
+            "uuid": "a080c61a-3587-48a3-87c7-510fdaeb5f62",
+            "type": "copy",
+            "src": { 
+                "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+                "dir": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee"
+            },
+            "dst": { 
+                "drive": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee",
+                "dir": "305d8beb-566d-4cf1-b7dd-b28dc2161fc1" 
+            },
+            "policies": {
+                "dir": [null, null],
+                "file": [null, null]
+            },
+            "entries": [ 
+                "foo"
+            ],
+            "nodes": [
+                {
+                    "type": "directory",
+                    "parent": null,
+                    "src": {
+                        "uuid": "4ea257bc-708e-49a4-9ad0-08c5f9c65c99",
+                        "name": "foo"
+                    },
+                    "dst": {
+                        "uuid": "305d8beb-566d-4cf1-b7dd-b28dc2161fc1",
+                        "name": "foo"
+                    },
+                    "policy": [],
+                    "state": "Preparing"
+                },
+            ],
+            "finished": false,
+            "error": null,
+            "stepping": false,
+
+            "finished": {
+                fileCount: 0,
+                dirCount: 0,
+            },
+            "failed": []
+        }
+
+
+
+## 任务单例 [/tasks/{taskUUID}]
+
++ Parameters
+    + taskUUID: `a76f75c8-7bbb-4473-b8d6-4865c5009675` - task uuid
+
+### 查看任务状态 [GET]
+
+获得一个任务状态，返回一个任务的view。
+
+客户端业务需要关注：
+
+1. finished，判断一个任务是否已经完成
+2. nodes中的state为`Conflict`的子任务，客户端可以通过更新单一任务的Policy改变子任务状态，同时可以将该Policy应用至全局；
+
++ Response 200 (application/json)
+
+
+### 删除任务 [DELETE]
+
++ Response 200
+
+## 子任务 [/tasks/{taskUUID}/nodes/{nodeUUID}]
+
+子任务的标识`nodeUUID`是任务视图中node.src.uuid。
+
++ Parameters
+    + taskUUID: `a76f75c8-7bbb-4473-b8d6-4865c5009675` - task uuid
+    + nodeUUID: `4c273c3a-ac93-4f98-8dfb-3672a494061f` - node uuid
+
+### 更新一个子任务 [PATCH]
+
+只有`Conflict`状态的子任务可以更新。
+
+**数据结构**
+
+```json
+{
+    "policy": ["skip", null]
+    "applyToAll": true
+}
+```
+
+- policy - Policy，必须提供
+- applyToAll - bool类型，可选提供，如果提供且不为true，视为false
+
++ Request retry (application/json)
+
+        {
+            "policy": ["skip", null]
+            "applyToAll": true
+        }
+
++ Response 200 
+
+# Group Fruitmix
+
+Fruitmix API提供Fruitmix文件系统的统计信息和运行时状态。
+
+## 统计信息 [/fruitmix/stats]
+
+### 获取统计信息 [GET]
+
+```json
+{
+    "files": {
+        "image": {
+            "count": 1234,
+            "totalSize": 12345678
+        },
+        "video": {
+            "count": 1234,
+            "totalSize": 12345678
+        },
+        "audio": {
+            "count": 1234,
+            "totalSize": 12345678    
+        },
+        "document": {
+            "count": 1234,
+            "totalSize": 12345678    
+        }
+    },
+    "space": {
+        "used": 12345678,
+        "total": 8888888888
+    }
+}
+```
+
++ Response 200
+
+# Group Transmission
+
+`Transmission` 是下载功能的模块, 使用了transmission-daemon进程为下载提供服务
+
+status 定义如下:
+
+``` javascript
+    {
+        STOPPED       : 0,  # Torrent is stopped (pause)
+        CHECK_WAIT    : 1,  # Queued to check files
+        CHECK         : 2,  # Checking files
+        DOWNLOAD_WAIT : 3,  # Queued to download
+        DOWNLOAD      : 4,  # Downloading 
+        SEED_WAIT     : 5,  # Queued to seed (finish)
+        SEED          : 6,  # Seeding (finish)
+        ISOLATED      : 7   # Torrent can't find peers
+    }
+```
+## 任务列表 [/transmission]
+
+### 查询任务列表 [GET]
+
+task object 定义如下:
+1. `id` : Id of task,
+2. `name` : Name of task,
+3. `dirUUID` : Target directory uuid,
+4. `rateDownload` : Download rate in bps,
+5. `percentDone` : Download progress 0.0 to 1.0,
+6. `eta` : Estimated number of seconds left when downloading,
+7. `status` : above
+
++ Response 200
+
+            { 
+                "downloading": [ 
+                    {   
+                        "dirUUID": "testUUID",
+                        "userUUID": "cb33b5b3-dd58-470f-8ccc-92aa04d75590",
+                        "uuid": "17639839-c27a-4490-aa0e-50c20ccea296",
+                        "id": 8,
+                        "name": "阳光电影www.ygdy8.com.王牌特工2：黄金圈.BD.720p.国英双语双字.mkv",
+                        "rateDownload": 0,
+                        "percentDone": 0,
+                        "eta": -2,
+                        "status": 4 
+                    } 
+                ],
+                "downloaded": [] 
+            }
+
+### 创建任务 [POST]
+
+transmission 有两种创建方式: 磁链/种子
+
++ Request 创建磁链任务 (application/json)
+
+            {
+                "magnetURL": "magnet:?xt=urn:btih:61cf2a75570...",
+                "dirUUID": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee"
+            }
+
++ Response 200
+
+            {   
+                "hashString": "61cf2a75570474bb3ac4894cdbc8f79917335009",
+                "id": 8,
+                "name": "阳光电影www.ygdy8.com.王牌特工2：黄金圈.BD.720p.国英双语双字.mkv"
+            }
+
++ Request 创建种子任务 (multipart/form-data)
+
+        {
+            "torrent": torrent file,
+            "dirUUID": "e2adb5d0-c3c7-4f2a-bd64-3320a1ed0dee"
+        }
+
++ Response 200
+
+        {   
+            hashString: '61cf2a75570474bb3ac4894cdbc8f79917335009',
+            id: 8,
+            name: '阳光电影www.ygdy8.com.王牌特工2：黄金圈.BD.720p.国英双语双字.mkv' 
+        }
+
+
+
+## 操作 [/transmission/{id}]
+
+transmission 有三种操作: 暂停/续传/删除
+
++ Parameters
+    + id: 3 - id of task
+
+### 暂停/续传/删除 [PATCH]
+
+删除操作比其他PATCH操作多个一个`uuid`参数
+
++ Request 暂停任务 (application/json)
+
+        {
+            "op": "pause"
+        }
+
++ Response 200
+
++ Request 续传任务 (application/json)
+
+        {
+            "op": "resume"
+        }
+
++ Response 200
+
++ Request 删除任务 (application/json)
+
+        {
+            "op": "destroy",
+            "uuid": task uuid
+        }
+
++ Response 200
+
+# Group Samba
+
+## samba操作 [/samba]
+
+### 查询samba开关 [GET]
+
+samba开关状态现在没有持久化(2018-6-6)
+
++ Response 200
+
+            { 
+                "status": "active"
+            }
+
+### samba开关操作 [POST]
+
++ Request 启用samba服务 (application/json)
+
+            {
+                "op": "start"
+            }
+
+
++ Response 200
+
++ Request 关闭samba服务 (application/json)
+
+            {
+                "op": "close"
+            }
+
++ Response 200
+
+# Group Dlna
+
+## dlna [/dlna]
+
+### 查询dlna开关 [GET]
+
+dlna开关状态现在没有持久化(2018-6-13)
+
++ Response 200
+
+            { 
+                "isActive": "true"
+            }
+
+### dlna开关操作 [POST]
+
++ Request 启用dlna服务 (application/json)
+
+            {
+                "op": "start"
+            }
+
+
++ Response 200
+
++ Request 关闭dlna服务 (application/json)
+
+            {
+                "op": "close"
+            }
+
+
++ Response 200
+
+
+

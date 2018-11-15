@@ -24,7 +24,8 @@
     "lycmon": "NODE_ENV=test nodemon --exec nyc --reporter=lcov --reporter=text mocha --compilers js:babel-core/register",
     "doc": "nodemon --ignore out --ignore tmpest --exec 'jsdoc -c jsdoc.conf.json -t node_modules/ink-docstrap/template -r -p src src/README.md'",
     "baseline": "nodemon --ignore out --ignore tmpest --exec 'jsdoc -c jsdoc.conf.json -t node_modules/jsdoc-baseline -r -p src src/README.md'",
-    "sidekick": "node src/fruitmix/sidekick/cluster"
+    "sidekick": "node src/fruitmix/sidekick/cluster",
+    "api": "./node_modules/.bin/aglio --theme-template triple -i docs/station.apib -s -p 9000"
   },
   "dependencies": {
     "@ronomon/crypto-async": "^2.2.1",
