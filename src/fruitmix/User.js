@@ -331,7 +331,7 @@ class User extends EventEmitter {
       } else {
         let firstUser = Object.assign({}, users[index])
         if (GLOBAL_CONFIG.type === 'winas') {
-          if (firstUser.winasUserId !== boundUser.winasUserId) {
+          if (firstUser.winasUserId !== boundUser.id) {
             console.log('===================')
             console.log('This is not an error, but fruitmix received a bound user')
             console.log('different than the previous one, exit')
