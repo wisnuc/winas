@@ -16,6 +16,6 @@
 
   },
   "pipe": {
-    "baseURL": "https://test.nodetribe.com"
+    "baseURL": "http://test.nodetribe.com"
   }
 }
