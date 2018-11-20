@@ -13,5 +13,8 @@
   },
   "drive": {
 
+  },
+  "pipe": {
+    "baseURL": "https://abel.nodetribe.com"
   }
 }

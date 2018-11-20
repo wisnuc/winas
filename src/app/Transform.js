@@ -277,10 +277,7 @@ class Pipe extends EventEmitter {
     let resErr
     if (error) {
       error = formatError(error)
-      resErr = {
-        msg: error.message,
-        status: error.status
-      }
+      resErr = error
     }
 
     let uri = getURL(this.ctx.deviceSN, message.sessionId, false)
