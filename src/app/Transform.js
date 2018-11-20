@@ -8,7 +8,9 @@ const debug = require('debug')('ws:transform')
 
 const routing = require('./routing')
 
-const getURL = (stationId, jobId) => `https://abel.nodetribe.com/s/v1/station/${stationId}/response/${jobId}`
+const Config = require('config')
+
+const getURL = (stationId, jobId) => `${Config.pipe.baseURL}/s/v1/station/${stationId}/response/${jobId}`
 
 const RE_BOUNDARY = /^multipart\/.+?(?:; boundary=(?:(?:"(.+)")|(?:([^\s]+))))$/i
 const routes = []
