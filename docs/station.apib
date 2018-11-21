@@ -1700,7 +1700,8 @@ If `overwrite` is provided:
     "policy": [null, null],
     "bfilename": "aaa.json",
     "bctime": 152555555555,
-    "bmtime": 158888888888
+    "bmtime": 158888888888,
+    "uptype": "backup"
 }
 ```
 
@@ -1708,7 +1709,7 @@ If `overwrite` is provided:
 + `size`必须，类型为数值，取值范围：0 <= size <= 1G
 + `sha256`必须为sha256字符，
 + `bfilename`, `bctime`, `bmtime` 目前只用于backup目录下文件
-
++ `uptype` 在备份文件至备份drive时, required 且等于 `backup`
 size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 1024 * 1024），超过1G的文件应该用newfile和append组合操作完成。
 
 原来使用`overwrite`的逻辑，可以用`["replace", null]`实现。

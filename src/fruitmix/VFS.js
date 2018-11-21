@@ -524,7 +524,10 @@ class VFS extends EventEmitter {
 
   BACKUP_NEWFILE (user, props, callback) {
     // TODO: validate bfilename bctime bmtime
-    let { name, data, sha256, bfilename, bctime, bmtime } = props
+    let { name, data, sha256, bfilename, bctime, bmtime, driveUUID } = props
+    let drive = this.drives.find(d => d.uuid === driveUUID)
+    if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
+    if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
