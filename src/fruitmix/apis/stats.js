@@ -36,7 +36,7 @@ class Stats {
         others.count++
       }
     }
-    let totalSize
+    let totalSize = 0
     Array.from(this.vfs.forest.roots.values()).forEach(x => totalSize += x.stats().fileTotalSize || 0)
     others.totalSize = totalSize - image.totalSize - video.totalSize - audio.totalSize - document.totalSize
     others.totalSize = others.totalSize > 0 ? others.totalSize : 0
