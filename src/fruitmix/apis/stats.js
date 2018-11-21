@@ -15,6 +15,7 @@ class Stats {
     let video = { count: 0, totalSize: 0 }
     let audio = { count: 0, totalSize: 0 }
     let document = { count: 0, totalSize: 0 }
+    let others = { count: 0, totalSize: 0 }
 
     let map = this.vfs.forest.fileMap     
     for (const [uuid, file] of map) {
@@ -31,10 +32,15 @@ class Stats {
       } else if (DocTypes.includes(type)) {
         document.count++
         document.totalSize += file.size
+      } else {
+        others.count++
       }
     }
-
-    process.nextTick(() => callback(null, { image, video, audio, document }))
+    let totalSize
+    Array.from(this.vfs.forest.roots.values()).forEach(x => totalSize += x.stats().fileTotalSize || 0)
+    others.totalSize = totalSize - image.totalSize - video.totalSize - audio.totalSize - document.totalSize
+    others.totalSize = others.totalSize > 0 ? others.totalSize : 0
+    process.nextTick(() => callback(null, { image, video, audio, document, others }))
   }
 }
 
