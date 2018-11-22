@@ -152,7 +152,7 @@ class Pipe extends EventEmitter {
         throw formatError(new Error(`this resource: ${resource}, not support`), 400)
       }
 
-      if (!headers || !headers['Set-Cookie']) {
+      if (!headers || !headers['set-cookie']) {
         throw formatError(new Error(`headers error`), 400)
       }
 
@@ -295,7 +295,7 @@ class Pipe extends EventEmitter {
       method: 'POST',
       headers: { 
         Authorization: this.ctx.config.cloudToken,
-        'Set-Cookie': message.headers['Set-Cookie']
+        'Cookie': message.headers['set-cookie']
       },
       body: true,
       json: {
@@ -316,8 +316,8 @@ class Pipe extends EventEmitter {
 
     let headers = message.headers
     let start, end
-    if (headers && headers['Range']) {
-      const rangeArr = headers['Range'].slice(5).split('-').filter(x => !!x)
+    if (headers && headers['range']) {
+      const rangeArr = headers['range'].slice(5).split('-').filter(x => !!x)
       if (rangeArr.length === 1) {
         start = parseInt(rangeArr[0])
       }
@@ -331,7 +331,8 @@ class Pipe extends EventEmitter {
       url: getURL(this.ctx.deviceSN, message.sessionId, false),
       headers: {
         Authorization: this.ctx.config.cloudToken,
-        'content-type': 'application/octet-stream'
+        'content-type': 'application/octet-stream',
+        'Cookie': message.headers['set-cookie']
       },
       body: fs.createReadStream(absolutePath, { start, end })
     }, (error, response, body) => {
@@ -349,7 +350,10 @@ class Pipe extends EventEmitter {
     return request({
       uri: getURL(this.ctx.deviceSN, message.sessionId, false),
       method: 'GET',
-      headers: { Authorization: this.ctx.config.cloudToken }
+      headers: {
+        Authorization: this.ctx.config.cloudToken,
+        'Cookie': message.headers['set-cookie']
+      }
     })
   }
 }
