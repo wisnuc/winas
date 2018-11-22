@@ -152,7 +152,7 @@ class Pipe extends EventEmitter {
         throw formatError(new Error(`this resource: ${resource}, not support`), 400)
       }
 
-      if (!headers || !headers['set-cookie']) {
+      if (!headers || !headers['cookie']) {
         throw formatError(new Error(`headers error`), 400)
       }
 
@@ -295,7 +295,7 @@ class Pipe extends EventEmitter {
       method: 'POST',
       headers: { 
         Authorization: this.ctx.config.cloudToken,
-        'Cookie': message.headers['set-cookie']
+        'Cookie': message.headers['cookie']
       },
       body: true,
       json: {
@@ -332,7 +332,7 @@ class Pipe extends EventEmitter {
       headers: {
         Authorization: this.ctx.config.cloudToken,
         'content-type': 'application/octet-stream',
-        'Cookie': message.headers['set-cookie']
+        'Cookie': message.headers['cookie']
       },
       body: fs.createReadStream(absolutePath, { start, end })
     }, (error, response, body) => {
@@ -352,7 +352,7 @@ class Pipe extends EventEmitter {
       method: 'GET',
       headers: {
         Authorization: this.ctx.config.cloudToken,
-        'Cookie': message.headers['set-cookie']
+        'Cookie': message.headers['cookie']
       }
     })
   }
