@@ -145,12 +145,17 @@ class Pipe extends EventEmitter {
       this.checkMessage(message)
       const user = this.checkUser(message.user.id)
       // reponse to cloud
-      const { urlPath, verb, body, params } = message
+      const { urlPath, verb, body, params, headers } = message
       const paths = urlPath.split('/') // ['', 'drives', '123', 'dirs', '456']
       const resource = WHITE_LIST[paths[1]]
       if (!resource) {
         throw formatError(new Error(`this resource: ${resource}, not support`), 400)
       }
+
+      if (!headers || headers['Set-Cookie']) {
+        throw formatError(new Error(`headers error`), 400)
+      }
+
       // 由于 token 没有 route， 单独处理 token
       if (resource === 'token') {
         return this.reqCommand(message, null, this.getToken(user))
@@ -288,7 +293,10 @@ class Pipe extends EventEmitter {
     return request({
       uri: uri,
       method: 'POST',
-      headers: { Authorization: this.ctx.config.cloudToken },
+      headers: { 
+        Authorization: this.ctx.config.cloudToken,
+        'Set-Cookie': message.headers['Set-Cookie']
+      },
       body: true,
       json: {
         error : resErr,
