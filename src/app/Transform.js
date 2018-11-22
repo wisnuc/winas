@@ -152,7 +152,7 @@ class Pipe extends EventEmitter {
         throw formatError(new Error(`this resource: ${resource}, not support`), 400)
       }
 
-      if (!headers || headers['Set-Cookie']) {
+      if (!headers || !headers['Set-Cookie']) {
         throw formatError(new Error(`headers error`), 400)
       }
 
