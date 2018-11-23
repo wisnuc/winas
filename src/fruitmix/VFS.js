@@ -422,6 +422,7 @@ class VFS extends EventEmitter {
           } catch(e) {
             return callback(e)
           }
+          xstat.metadata = props.metadata
         }
         // this only happens when skip diff policy taking effect
         if (!xstat) return callback(null, null, resolved)
