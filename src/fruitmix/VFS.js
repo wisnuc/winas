@@ -417,7 +417,7 @@ class VFS extends EventEmitter {
         if (props.metadata) {
           try {
             let attr = JSON.parse(xattr.getSync(target, 'user.fruitmix'))
-            attr.metadata = metadata
+            attr.metadata = props.metadata
             xattr.setSync(target, 'user.fruitmix', JSON.stringify(attr))
           } catch(e) {
             return callback(e)
