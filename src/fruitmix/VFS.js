@@ -414,10 +414,6 @@ class VFS extends EventEmitter {
       */
       mkdir(target, props.policy, (err, xstat, resolved) => {
         if (err) return callback(err)
-
-        // this only happens when skip diff policy taking effect
-        if (!xstat) return callback(null, null, resolved)
-        if (!props.read) return callback(null, xstat, resolved)
         if (props.metadata) {
           try {
             let attr = JSON.parse(xattr.getSync(target, 'user.fruitmix'))
@@ -427,6 +423,9 @@ class VFS extends EventEmitter {
             return callback(e)
           }
         }
+        // this only happens when skip diff policy taking effect
+        if (!xstat) return callback(null, null, resolved)
+        if (!props.read) return callback(null, xstat, resolved)
         dir.read((err, xstats) => {
           if (err) return callback(err)
 
