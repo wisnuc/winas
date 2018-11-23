@@ -405,7 +405,9 @@ class VFS extends EventEmitter {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
       if (!props.policy) props.policy = [null, null]
-      
+      if (props.metadata && dir.uuid !== props.driveUUID) {
+        return callback(new Error('metadata dir must be sub folder for drive'), { status: 400 })
+      }
       let target = path.join(this.absolutePath(dir), props.name)
       /**
       FIXME: This function is problematic. readXattr may race!
@@ -416,7 +418,15 @@ class VFS extends EventEmitter {
         // this only happens when skip diff policy taking effect
         if (!xstat) return callback(null, null, resolved)
         if (!props.read) return callback(null, xstat, resolved)
-
+        if (props.metadata) {
+          try {
+            let attr = JSON.parse(xattr.getSync(target, 'user.fruitmix'))
+            attr.metadata = metadata
+            xattr.setSync(target, 'user.fruitmix', JSON.stringify(attr))
+          } catch(e) {
+            return callback(e)
+          }
+        }
         dir.read((err, xstats) => {
           if (err) return callback(err)
 

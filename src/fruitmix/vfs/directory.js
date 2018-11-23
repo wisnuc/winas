@@ -331,6 +331,7 @@ class Directory extends Node {
 
     this.archived = xstat.archived
     this.deleted = xstat.deleted
+    this.metadata = xstat.metadata
 
     this.fileSize = 0
     this.fileCount = 0

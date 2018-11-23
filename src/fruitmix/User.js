@@ -371,8 +371,8 @@ class User extends EventEmitter {
       }
     },
     err => err
-      ? console.log(`user module failed to bind first user to ${boundUser.phicommUserId}`, err)
-      : console.log(`user module bound first user to ${boundUser.phicommUserId} successfully`))
+      ? console.log(`user module failed to bind first user to ${boundUser.winasUserId}`, err)
+      : console.log(`user module bound first user to ${boundUser.winasUserId} successfully`))
   }
 
   destroy (callback) {

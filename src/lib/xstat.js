@@ -130,6 +130,9 @@ const readXattr = (target, stats, callback) => {
     }
 
     if (stats.isDirectory()) {
+      if (orig.metadata) {
+        attr.metadata = orig.metadata
+      }
       // if (Object.keys(orig).length !== 1) attr.dirty = undefined
     } else {
       if (orig.hasOwnProperty('hash') || orig.hasOwnProperty('time')) {
@@ -272,6 +275,7 @@ const createXstat = (target, stats, attr) => {
       name,
       mtime: stats.mtime.getTime()
     }
+    if (attr.metadata) xstat.metadata = attr.metadata
   } else {
     xstat = {
       uuid: attr.uuid,
@@ -374,7 +378,7 @@ This function is supposed to be used only for temporary file
 @param {number[]} [props.tags] - preserve tags, accept empty array
 */
 const forceXstat = (target, props, callback) => {
-  let { uuid, hash, tags, archived, deleted, bfilename, bctime, bmtime } = props || {}
+  let { uuid, hash, tags, archived, deleted, bfilename, bctime, bmtime, metadata } = props || {}
 
   if (uuid && !isUUID(uuid)) {
     let err = new Error('invalid uuid')
@@ -405,7 +409,7 @@ const forceXstat = (target, props, callback) => {
 
     if (tags.length === 0) tags = undefined
   }
-  // TODO: validate bfilename bctime bmtime
+  // TODO: validate bfilename bctime bmtime, dir -> metadata
   fs.lstat(target, (err, stat) => {
     if (err) return callback(err)
     if (!stat.isDirectory() && !stat.isFile()) return callback(EUnsupported(stat))
@@ -420,6 +424,8 @@ const forceXstat = (target, props, callback) => {
       if (bfilename) attr.bfilename = bfilename
       if (bctime) attr.bctime = bctime
       if (bmtime) attr.bmtime = bmtime
+    } else {
+      if (metadata) attr.metadata = metadata
     }
 
     attr.archived = archived

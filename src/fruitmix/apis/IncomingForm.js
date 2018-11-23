@@ -254,7 +254,7 @@ class Parsing extends State {
         return this.setState(Failed, e)
       }
 
-      let { op, policy, tags, uuid } = body
+      let { op, policy, tags, uuid, metadata, uptype } = body
 
       try {
         if (op === 'mkdir' || op === 'rename' || op === 'dup') {
@@ -265,6 +265,11 @@ class Parsing extends State {
           if (op === 'rename' || op === 'dup') {
             if (this.ctx.args.fromName === this.ctx.args.toName) throw new Error('two distinct names required')
           }
+
+          if (op === 'mkdir' && uptype === 'backup') {
+            Object.assign(this.ctx.args, { uptype, metadata })
+          } 
+
         } else if (op === 'remove' || op === 'archive' || op === 'delete') {
           Object.assign(this.ctx.args, { op, uuid })
           if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
@@ -434,7 +439,9 @@ class Executing extends State {
         case 'mkdir':
           this.ctx.ctx.apis.mkdir({ 
             name: args.toName,
-            policy: args.policy
+            policy: args.policy,
+            metadata: args.metadata,
+            uptype: args.uptype
           }, (err, xstat, resolved) => {
             if (err) {
               this.setState(Failed, err)
