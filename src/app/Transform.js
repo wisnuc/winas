@@ -161,10 +161,19 @@ class Pipe extends EventEmitter {
         return this.reqCommand(message, null, this.getToken(user))
       }
       // 单独处理 boot
-      if (resource === 'boot' && paths.length === 2) {
-        if (verb.toUpperCase() === 'GET') return this.reqCommand(message, null, this.getBootInfo())
-        else if (verb.toUpperCase() === 'PATCH') {
-          return this.ctx.boot.PATCH_BOOT(user, body, err => this.reqCommand(message, err, {}))
+      if (resource === 'boot') {
+        if (paths.length === 2) {
+          if (verb.toUpperCase() === 'GET') return this.reqCommand(message, null, this.getBootInfo())
+          else if (verb.toUpperCase() === 'PATCH') {
+            return this.ctx.boot.PATCH_BOOT(user, body, err => this.reqCommand(message, err, {}))
+          }
+          throw formatError(new Error('not found'), 404)
+        } else if (paths.length === 3) {
+          if (verb.toUpperCase() === 'GET' && paths[paths.length -1] === 'space')
+            return this.ctx.boot.GET_BoundVolume(user, (err, data) => {
+              this.reqCommand(message, err, data)
+            })
+          throw formatError(new Error('not found'), 404)
         }
         throw formatError(new Error('not found'), 404)
       }
