@@ -194,9 +194,10 @@ const readXattr = (target, stats, callback) => {
       }
       // TODO: validate bfilename bctime bmtime
       attr.bfilename = orig.bfilename
-      attr.bctime = orig.bctime
-      attr.bmtime = orig.bmtime
     }
+
+    attr.bctime = orig.bctime
+    attr.bmtime = orig.bmtime
 
     // for backup dirs
     if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
@@ -292,10 +293,11 @@ const createXstat = (target, stats, attr) => {
       xstat.metadata = metadata
     }
     if (attr.bfilename) xstat.bfilename = attr.bfilename
-    if (attr.bctime) xstat.bctime = attr.bctime
-    if (attr.bmtime) xstat.bmtime = attr.bmtime
+    
   }
-
+  
+  if (attr.bctime) xstat.bctime = attr.bctime
+  if (attr.bmtime) xstat.bmtime = attr.bmtime
   // add for backup dirs/ files
   xstat.archived = attr.archived
   xstat.deleted = attr.deleted
@@ -422,12 +424,12 @@ const forceXstat = (target, props, callback) => {
       }
       if (tags) attr.tags = tags
       if (bfilename) attr.bfilename = bfilename
-      if (bctime) attr.bctime = bctime
-      if (bmtime) attr.bmtime = bmtime
     } else {
       if (metadata) attr.metadata = metadata
     }
 
+    attr.bctime = bctime
+    attr.bmtime = bmtime
     attr.archived = archived
     attr.deleted = deleted
 

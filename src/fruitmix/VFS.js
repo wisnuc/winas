@@ -414,15 +414,19 @@ class VFS extends EventEmitter {
       */
       mkdir(target, props.policy, (err, xstat, resolved) => {
         if (err) return callback(err)
-        if (props.metadata) {
+        if (props.uptype === 'backup') {
           try {
             let attr = JSON.parse(xattr.getSync(target, 'user.fruitmix'))
             attr.metadata = props.metadata
+            attr.bctime = props.bctime
+            attr.bmtime = props.bmtime
             xattr.setSync(target, 'user.fruitmix', JSON.stringify(attr))
           } catch(e) {
             return callback(e)
           }
           xstat.metadata = props.metadata
+          xstat.bctime = props.bctime
+          xstat.bmtime = props.bmtime
         }
         // this only happens when skip diff policy taking effect
         if (!xstat) return callback(null, null, resolved)
