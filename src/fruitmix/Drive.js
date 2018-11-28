@@ -208,7 +208,7 @@ class Drive extends EventEmitter {
 
   updateBackupDrive (user, props, callback) {
     this.storeSave(drives => {
-      let index = drives.findIndex(drv => drv.uuid === driveUUID)
+      let index = drives.findIndex(drv => drv.uuid === props.driveUUID)
       if (index === -1) throw new Error('backup drive not found')
       let priv = Object.assign({}, drives[index])
       if (user.uuid !== priv.owner) throw new Error('Permission Denied')
@@ -219,16 +219,16 @@ class Drive extends EventEmitter {
       if (props.client && typeof props.client === 'object') priv.client = props.client
       priv.mtime = new Date().getTime()
       return [...drives.slice(0, index), priv, ...drives.slice(index + 1)]
-    }, (err, data) => err ? callback(err) : callback(null, data.find(d => d.uuid === driveUUID)))
+    }, (err, data) => err ? callback(err) : callback(null, data.find(d => d.uuid === props.driveUUID)))
   }
 
-  deleteBackupDrive (user, callback) {
+  deleteBackupDrive (user, props, callback) {
     this.storeSave(drives => {
-      let index = drives.findIndex(drv => drv.uuid === driveUUID)
+      let index = drives.findIndex(drv => drv.uuid === props.driveUUID)
       if (index === -1) throw Object.assign(new Error('backup drive not found'), { status: 404 })
       let drv = Object.assign({}, drives[index])
       if (user.uuid !== drv.owner) throw new Error('Permission Denied')
-      if (drv.isDeleted) throw Object.assign(new Error('backup drive not found'), { status: 404 }) 
+      if (drv.isDeleted || drv.type !== 'backup') throw Object.assign(new Error('backup drive not found'), { status: 404 }) 
       drv.isDeleted = true
       drv.mtime = new Date().getTime()
       return [...drives.slice(0, index), drv, ...drives.slice(index + 1)]

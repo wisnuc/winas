@@ -159,7 +159,7 @@ class IPre extends EventEmitter {
       this.ws.on('error', err => this.error(err))
       this.ws.on('finish', () => {
         if (this.ws.bytesWritten !== this.size) {
-          this.error('bytesWritten different than expected size')
+          this.error(new Error('bytesWritten different than expected size'))
         } else {
           this.ws = null
           this.emit('finish')
