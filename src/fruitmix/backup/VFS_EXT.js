@@ -1,18 +1,10 @@
-const Promise = require('bluebird')
-const fs = Promise.promisifyAll(require('fs'))
-const xstatAsync = Promise.promisifyAll(require('../lib/xstat'))
-
 module.exports = {
-
-  async DIRAsync (user, props) {
-    return Promise.promisify(this.DIR).bind(this)
-  },
 
   mkfileOrDir (tmp, target, xattr, callback) {
     let { uuid, hash, metadata, bctime, bmtime, fingerprint, bname } = xattr
     // let type = tmp ? 'file' : 'directory'
     let f =  tmp ?
-      cb => forceXstat(tmp, { uuid, hash, bctime, bmtime, fingerprint, bname }, (err, xstat) => 
+      cb => forceXstat(tmp, { fmeta: [{ bctime, bmtime, fingerprint, bname }], uuid, hash }, (err, xstat) => 
         err ? cb(err) : fs.link(tmp, target, err => err ? cb(err) : cb(null, xstat))) :
       cb => {
         let tmpDir = this.TMPFILE()
@@ -26,37 +18,122 @@ module.exports = {
       }
 
     f((err, xstat) => {
-      if (err && err.code === 'EEXIST') {
-
-      } else if (err && err.code === 'ENOTEMPTY') {
-
-      } else if (err) {
-
+      if (err && err.code === 'EEXIST') { // file or dir
+        xattr.get(target, 'user.fruitmix', (err, xa) => {
+          if (err) return callback(err)
+          try {
+            xa = JSON.parse(xa)
+          } catch(e) {
+            return callback(Object.assign(e, { xcode: 'EXATTR' }))
+          }
+          let fmeta = xa.fmeta || []
+          fmeta.push({ bctime, bmtime, fingerprint, bname })
+          xa.fmeta = fmeta
+          xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
+            return err ? callback(err) : callback(null, xa)
+          })
+        })
+      } else if (err && err.code === 'ENOTEMPTY') { // dir
+        xattr.get(target, 'user.fruitmix', (err, xa) => {
+          if (err) return callback(err)
+          try {
+            xa = JSON.parse(xa)
+          } catch(e) {
+            return callback(Object.assign(e, { xcode: 'EXATTR' }))
+          }
+          Object.assign(xa, { uuid, metadata, bctime, bmtime, archived: undefined }) // FIXME: archice all sibling?
+          xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
+            return err ? callback(err) : callback(null, xa)
+          })
+        })
+      } else if (err) { // TODO: ENOTDIR (rename dir to place where already has a file named)
+        callback(err)
       } else {
         callback(null, xstat)
       }
     })
   },
 
-  archive () {
-
+  archive (target, callback) {
+    this.updateXattr(target, { archived: true, archivedTime: new Date.getTime() }, callback)
   },
 
-  unarchive () {
-
+  unarchiveDirChainAsync (dir) {
+    let archivedP = this.archivedParent(dir)
+    if (!archivedP) return
+    if (dir.uuid === archivedP.uuid) {
+      await new Promise((resolve, reject) => {
+        this.updateXattr(archivedP.abspath(), { archived: undefined, archivedTime: undefined }, err =>
+          err ? reject(err) : resolve())
+      })
+    } else {
+      let nodepath = dir.nodepath()
+      let index = nodepath.findIndex(n => n.uuid === archivedP.uuid)
+      if (index === -1) throw new Error('archived parent lost')
+      nodepath = nodepath.slice(index + 1) // without archivedP
+      let archivedT = archivedP.archiveTime
+      for (let i = 0; i < nodepath.length; i ++) {
+        // archive sibling
+        await this.archiveSiblingsAsync(nodepath[i], archivedT)
+        // unarchive itself
+        await this.updateXattrAsync(nodepath[i].abspath(), { archived: undefined, archiveTime: undefined })
+      }
+      // unarchive top archived dir
+      await this.updateXattrAsync(archivedP.abspath(), { archived: undefined, archiveTime: undefined })
+    }
   },
 
-  delete () {
+  async updateXattrAsync(target, opts) {
+    return Promise.promisify(this.updateXattr).bind(this)(target, opts)
+  },
+
+  updateXattr (target, opts, callback) {
+    xattr.get(target, 'user.fruitmix', (err, xa) => {
+      if (err) return callback(err)
+      try {
+        xa = JSON.parse(xa)
+      } catch(e) {
+        return callback(Object.assign(e, { xcode: 'EXATTR' }))
+      }
+      Object.assign(xa, opts)
+      xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
+        return err ? callback(err) : callback(null, xa)
+      })
+    })
+  },
+
+  async archiveSiblingsAsync (dir, time) {
+    if (!dir.parent) throw new Error('dir is root')
+    let files = await fs.readdirAsync(dir.parent.abspath())
+    if (count === 0) return
+    for (let i = 0; i < count; i ++ ) {
+      let file = files[i]
+      if (file !== dir.name) {
+        await new Promise((resolve, reject) => {
+          this.updateXattr(path.join(dir.parent.abspath(), x), { archived: true, archivedTime: time }, err => {
+            if (!err || (err && err.code === 'ENOENT')) {
+              resolve()
+            } else {
+              reject(err)
+            }
+          })
+        })
+      }
+      if (i === count -1) return
+    }
+  },
+
+  delete (target, ) {
 
   },
 
   archivedParent (dir) {
-    let archived
+    let archivedP
     do {
-      if (dir.isArchived)
-        this.archived = dir
+      if (dir.archived)
+        archivedP = dir
     } while(dir = dir.parent)
-    return archived
+    return archivedP
   },
 
   isTopDir (dir) {
@@ -71,16 +148,12 @@ module.exports = {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
+      let archived = this.archivedParent(dir)
+      if (archived) return callback(Object.assign(new Error('file already archived'), { status: 404 }))
       let target = path.join(this.absolutePath(dir), sha256)
-      forceXstat(data, {
-        bfilename: name, bctime, bmtime, hash: sha256 || null, fingerprint
-      }, (err, xstat) => {
-        if (err) return callback(err)
-        fs.rename(data, target, err => {
-          if (err) return callback(err)
-          return callback(null, xstat)
-        })
-      })
+      this.mkfileOrDir(data, target, {
+        bname: name, bctime, bmtime, hash: sha256 || null, fingerprint
+      }, callback)
     })
   },
 
@@ -196,14 +269,9 @@ module.exports = {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       let { name } = props
-      let dstPath = path.join(this.absolutePath(dir), name)
+      let target = path.join(this.absolutePath(dir), name)
       if (err) return callback(err)
-      try {
-        let attr = JSON.parse(xattr.getSync(dstPath, 'user.fruitmix'))
-        attr.archived = true
-        xattr.setSync(dstPath, 'user.fruitmix', JSON.stringify(attr))
-        return dir.read(callback)
-      } catch (e) { callback(e)}
+      this.archive(target, callback)
     })
   },
 
@@ -251,4 +319,7 @@ module.exports = {
       })
     })
   },
+
+  bUNARCHIVE (user, props, callback) {
+  }
 }
