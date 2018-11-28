@@ -8,11 +8,59 @@ module.exports = {
     return Promise.promisify(this.DIR).bind(this)
   },
 
-  isArchivedDir (dir) {
+  mkfileOrDir (tmp, target, xattr, callback) {
+    let { uuid, hash, metadata, bctime, bmtime, fingerprint, bname } = xattr
+    // let type = tmp ? 'file' : 'directory'
+    let f =  tmp ?
+      cb => forceXstat(tmp, { uuid, hash, bctime, bmtime, fingerprint, bname }, (err, xstat) => 
+        err ? cb(err) : fs.link(tmp, target, err => err ? cb(err) : cb(null, xstat))) :
+      cb => {
+        let tmpDir = this.TMPFILE()
+        fs.mkdir(tmpDir, err => {
+          if (err) return cb(err)
+          forceXstat(tmpDir, { uuid, metadata, bctime, bmtime }, err => {
+            if (err) return cb(err)
+            fs.rename(tmpDir, target, err => err ? cb(err) : cb(null, xstat))
+          })
+        })
+      }
+
+    f((err, xstat) => {
+      if (err && err.code === 'EEXIST') {
+
+      } else if (err && err.code === 'ENOTEMPTY') {
+
+      } else if (err) {
+
+      } else {
+        callback(null, xstat)
+      }
+    })
+  },
+
+  archive () {
+
+  },
+
+  unarchive () {
+
+  },
+
+  delete () {
+
+  },
+
+  archivedParent (dir) {
+    let archived
     do {
-      if (dir.isArchived) return true
+      if (dir.isArchived)
+        this.archived = dir
     } while(dir = dir.parent)
-    return false
+    return archived
+  },
+
+  isTopDir (dir) {
+    return dir.uuid === dir.root().uuid
   },
 
   bNEWFILE (user, props, callback) {
@@ -111,21 +159,26 @@ module.exports = {
   },
 
   bMKDIR (user, props, callback) {
-    let { metadata } = props
-    metadata = metadata || {}
+    let { metadata, bctime, bmtime, name } = props
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
-      let uuid = UUID.v4()
-      let target = path.join(this.absolutePath(dir), uuid)
-      metadata.name = props.name
-      let tmpDir = this.TMPFILE()
-      fs.mkdir(tmpDir, err => {
-        if (err) return callback(err)
-        forceXstat(tmpDir, { metadata, uuid }, (err, xstat) => {
-          fs.rename(tmpDir, target, e ? callback(e) : callback(null, xstat))
-        })
-      })
+      let archived = this.archivedParent(dir)
+      if (archived) {
+        
+      } else {
+        let uuid, dirname = UUID.v4()
+        if (this.isTopDir(dir)) {
+          metadata = typeof metadata === 'object' ? metadata : {}
+          metadata.name = name
+          uuid = dirname
+        } else {
+          dirname = name
+          metadata = undefined
+        }
+        let target = path.join(this.absolutePath(dir), dirname)
+        this.mkfileOrDir(null, target, { metadata, uuid, bctime, bmtime }, callback)
+      }
     })
   },
 
