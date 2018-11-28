@@ -159,13 +159,16 @@ module.exports = {
   },
 
   bMKDIR (user, props, callback) {
-    let { metadata, bctime, bmtime, name } = props
+    let { metadata, bctime, bmtime, name, driveUUID } = props
+    let drive = this.drives.find(d => d.uuid === driveUUID)
+    if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
+    if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
       let archived = this.archivedParent(dir)
       if (archived) {
-        
+        return callback(Object.assign(new Error('dir already archived'), { status: 400 }))
       } else {
         let uuid, dirname = UUID.v4()
         if (this.isTopDir(dir)) {
