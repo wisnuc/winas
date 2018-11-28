@@ -326,7 +326,7 @@ class Pipe extends EventEmitter {
     let headers = message.headers
     let start, end
     if (headers && headers['range']) {
-      const rangeArr = headers['range'].slice(5).split('-').filter(x => !!x)
+      const rangeArr = headers['range'].slice(6).split('-').filter(x => !!x)
       if (rangeArr.length === 1) {
         start = parseInt(rangeArr[0])
       }
