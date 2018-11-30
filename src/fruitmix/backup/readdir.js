@@ -31,13 +31,29 @@ const readdir = (dirPath, uuid, mtime, callback) => {
             }
           })
         } else {
-          let names = entries.sort()
-          for (let i = 0; i < names.length; i ++ ) {
-            
+          let prenames = entries.sort()
+          let attrFiles = []
+          let names = []
+          for (let i = 0; i < prenames.length; i ++ ) {
+            if (names[i].startsWith('.xattr.')) {
+              attrFiles.push(name[i])
+            } else 
+              names.push(prenames[i])
           }
-
           let running = 0
           let xstats = []
+
+          let done = () => readXstat(dirPath, (err, x2) => {
+            if (destroyed) return
+            if (err) return callback(err)
+            if (x2.type !== 'directory') {
+              callback(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' }))
+            } else if (x2.uuid !== uuid) {
+              callback(Object.assign(new Error('uuid mismatch'), { code: 'EINSTANCE' }))
+            } else {
+              callback(null, xstats, x2.mtime, x2.mtime !== x1.mtime)
+            }
+          })
           const schedule = () => {
             while (names.length > 0 && running < 16) {
               let name = names.shift()
@@ -45,52 +61,27 @@ const readdir = (dirPath, uuid, mtime, callback) => {
                 if (destroyed) return
                 if (!err && (lstat.isDirectory() || lstat.isFile())) { // skip
                   if (lstat.isDirectory) {
-
+                    readXstat(path.join(dirPath, name), (err, x2) => {
+                      if (destroyed) return
+                      if (!err) xstats.push(x2) 
+                      if (--running || names.length) {
+                        schedule() 
+                      } else 
+                        done()
+                    })
                   } else {
-                    
+                    // path.join(dirPath, name)
                   }
                 }
                 else if (--running || names.length) {
                   schedule() 
                 } else {
-                  readXstat(dirPath, (err, x2) => {
-                    if (destroyed) return
-                    if (err) return callback(err)
-                    if (x2.type !== 'directory') {
-                      callback(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' }))
-                    } else if (x2.uuid !== uuid) {
-                      callback(Object.assign(new Error('uuid mismatch'), { code: 'EINSTANCE' }))
-                    } else {
-                      callback(null, xstats, x2.mtime, x2.mtime !== x1.mtime)
-                    }
-                  })
-                }
-              })
-
-
-              readXstat(path.join(dirPath, name), (err, xstat) => {
-                if (destroyed) return
-                if (!err) xstats.push(xstat)
-                if (--running || names.length) {
-                  schedule() 
-                } else {
-                  readXstat(dirPath, (err, x2) => {
-                    if (destroyed) return
-                    if (err) return callback(err)
-                    if (x2.type !== 'directory') {
-                      callback(Object.assign(new Error('not a directory'), { code: 'ENOTDIR' }))
-                    } else if (x2.uuid !== uuid) {
-                      callback(Object.assign(new Error('uuid mismatch'), { code: 'EINSTANCE' }))
-                    } else {
-                      callback(null, xstats, x2.mtime, x2.mtime !== x1.mtime)
-                    }
-                  }) 
+                  done()
                 }
               })
               running++
             }
-          } 
-          
+          }
           schedule()
         }
       })   
