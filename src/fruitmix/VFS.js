@@ -158,6 +158,7 @@ class VFS extends EventEmitter {
 
     // all valid drive uuids that are not root
     let toBeCreated = valids
+      .filter(d => !d.isDeleted)
       .map(d => d.uuid)
       .filter(uuid => !this.forest.roots.has(uuid))
 

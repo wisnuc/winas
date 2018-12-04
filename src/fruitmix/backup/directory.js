@@ -14,7 +14,7 @@ class Reading extends Directory.prototype.Reading {
     // when _mtime is null, read xstats forcefully
     let _mtime = this.callbacks.length === 0 ? this.dir.mtime : null
 
-    debug('breaddir', dirPath, uuid, _mtime)
+    // debug('breaddir', dirPath, uuid, _mtime)
 
     this.readdir = readdir(dirPath, uuid, _mtime, (err, obj, mtime, transient) => {
       // change to debug
