@@ -347,6 +347,7 @@ const readFileXstat = (dirPath, hash, fileUUID, callback) => {
 const readWhiteout = (dirPath, callback) => {
   let targetPath = path.join(dirPath,'.whiteout.' + WO_UUID)
   fs.readFile(targetPath, (err, data) => {
+    if (err && err.code === 'ENOENT') return callback(null, [])
     if (err) return callback(err)
     let attr
     try {
