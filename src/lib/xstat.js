@@ -129,10 +129,25 @@ const readXattr = (target, stats, callback) => {
       return callback(null, { uuid: UUID.v4(), dirty: undefined })
     }
 
+    
     if (stats.isDirectory()) {
+      // backup add
       if (orig.metadata) {
         attr.metadata = orig.metadata
       }
+      attr.bname = orig.bname
+      attr.bctime = orig.bctime
+      attr.bmtime = orig.bmtime
+      if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
+        if (orig.hasOwnProperty('archived') && orig.archived === true) {
+          attr.archived = true
+        }
+
+        if (orig.hasOwnProperty('deleted') && orig.deleted === true) {
+          attr.deleted = true
+        }
+      }
+      
       // if (Object.keys(orig).length !== 1) attr.dirty = undefined
     } else {
       if (orig.hasOwnProperty('hash') || orig.hasOwnProperty('time')) {
@@ -191,22 +206,6 @@ const readXattr = (target, stats, callback) => {
             }
           }
         }
-      }
-      // TODO: validate bfilename bctime bmtime
-      attr.bname = orig.bname
-    }
-
-    attr.bctime = orig.bctime
-    attr.bmtime = orig.bmtime
-
-    // for backup dirs
-    if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
-      if (orig.hasOwnProperty('archived') && orig.archived === true) {
-        attr.archived = true
-      }
-
-      if (orig.hasOwnProperty('deleted') && orig.deleted === true) {
-        attr.deleted = true
       }
     }
 
@@ -276,7 +275,14 @@ const createXstat = (target, stats, attr) => {
       name,
       mtime: stats.mtime.getTime()
     }
+    // backup add
     if (attr.metadata) xstat.metadata = attr.metadata
+    if (attr.bname) xstat.bname = attr.bname
+    if (attr.bctime) xstat.bctime = attr.bctime
+    if (attr.bmtime) xstat.bmtime = attr.bmtime
+    xstat.archived = attr.archived
+    xstat.deleted = attr.deleted
+    //
   } else {
     xstat = {
       uuid: attr.uuid,
@@ -292,15 +298,7 @@ const createXstat = (target, stats, attr) => {
       delete metadata.ver
       xstat.metadata = metadata
     }
-    if (attr.bname) xstat.bname = attr.bname
-    
   }
-  
-  if (attr.bctime) xstat.bctime = attr.bctime
-  if (attr.bmtime) xstat.bmtime = attr.bmtime
-  // add for backup dirs/ files
-  xstat.archived = attr.archived
-  xstat.deleted = attr.deleted
 
   return xstat
 }
@@ -423,15 +421,14 @@ const forceXstat = (target, props, callback) => {
         attr.time = stat.mtime.getTime()
       }
       if (tags) attr.tags = tags
-      if (bname) attr.bname = bname
-    } else {
+    } else { // backup add
       if (metadata) attr.metadata = metadata
+      if (bname) attr.bname = bname
+      attr.bctime = bctime
+      attr.bmtime = bmtime
+      attr.archived = archived
+      attr.deleted = deleted
     }
-
-    attr.bctime = bctime
-    attr.bmtime = bmtime
-    attr.archived = archived
-    attr.deleted = deleted
 
     updateXattr(target, attr, stat.isFile(), (err, attr) => {
       if (err) return callback(err)
