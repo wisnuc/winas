@@ -149,7 +149,7 @@ class VFS extends EventEmitter {
     let toBeRemoved = valids.filter(drv => {
       if ((drv.privacy === true || drv.type === 'backup') && drv.isDeleted) {
         let owner = users.find(u => u.uuid === drv.owner) 
-        if (!owner || owner.status !== this.user.USER_STATUS.DELETED) return false
+        if (drv.privacy === true && (!owner || owner.status !== this.user.USER_STATUS.DELETED)) return false
         return true
       }
       if ((drv.privacy === false) && drv.isDeleted) return true
