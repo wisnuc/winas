@@ -117,6 +117,8 @@ class BACKUP {
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
     if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
+    if (!this.vfs.userCanWriteDrive(user, driveUUID))
+      return process.nextTick(() => callback(new Error('Permission Denied')))
     if (hash && fileUUID) {
       return this.updateFile(user, props, callback)
     } else {
