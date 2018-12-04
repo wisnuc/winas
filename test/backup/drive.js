@@ -184,7 +184,7 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-
+  /*
   it('delete pngfile1', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
@@ -262,5 +262,5 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-
+  */
 })
