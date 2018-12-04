@@ -104,7 +104,7 @@ const deleteFileAttr = (dirPath, hash, fileUUID, callback) => {
 const createDir = (target, attrs, callback) => {
   let { uuid, metadata, bctime, bmtime, bname } = attrs
   let f =  cb => {
-    let tmpDir = path.join(os.tmpdir(), UUID.v4())
+    let tmpDir = path.join(global.TMPDIR(), UUID.v4())
     fs.mkdir(tmpDir, err => {
       if (err) return cb(err)
       forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname }, err => {
@@ -360,7 +360,7 @@ const readWhiteout = (dirPath, callback) => {
 }
 
 const write = (data, target, hardLink, mtime, callback) => {
-  let tmpFile = path.join(os.tmpdir(), UUID.v4())
+  let tmpFile = path.join(global.TMPDIR(), UUID.v4())
   fs.writeFile(tmpFile, JSON.stringify(data, null, '  '), err => err
     ? callback(err)
     : hardLink ? fs.link(tmpFile, target, callback) 

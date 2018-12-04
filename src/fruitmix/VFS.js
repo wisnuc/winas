@@ -102,6 +102,9 @@ class VFS extends EventEmitter {
     this.driveDir = path.join(this.fruitmixDir, 'drives')
     mkdirp.sync(this.tmpDir)
 
+    //backup add
+    global.TMPDIR = () => this.tmpDir
+
     this.mediaMap = opts.mediaMap
 
     // observer user
