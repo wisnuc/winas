@@ -9,6 +9,7 @@ const mkdirp = require('mkdirp')
 
 const SortedArray = require('../../lib/sorted-array')
 const Directory = require('./directory')
+const BDirectory = require('../backup/directory')
 const File = require('./file')
 
 // const SortedMap = require('../../lib/sorted-map')
@@ -372,8 +373,8 @@ class Forest extends EventEmitter {
     }
   }
 
-  createRoot (uuid, xstat) {
-    let root = new Directory(this, null, xstat)
+  createRoot (uuid, xstat, backup) {
+    let root = backup ? new BDirectory(this, null, xstat) : new Directory(this, null, xstat)
     this.roots.set(uuid, root)
     return root
   }

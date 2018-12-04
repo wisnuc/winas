@@ -26,6 +26,7 @@ const { isUUID, isSHA256, isNonEmptyString } = require('../lib/assertion')
 const Node = require('./vfs/node')
 const File = require('./vfs/file')
 const Directory = require('./vfs/directory')
+const Backup = require('./backup/backup')
 
 const { btrfsConcat, btrfsClone, btrfsClone2 } = require('../lib/btrfs')
 
@@ -119,6 +120,8 @@ class VFS extends EventEmitter {
     this.forest = new Forest(this.fruitmixDir, opts.mediaMap)
     this.metaMap = this.forest.metaMap
     this.timeMap = this.forest.timeMap
+
+    this.backup = new Backup(this)
   }
 
   /**
@@ -194,7 +197,8 @@ class VFS extends EventEmitter {
       name,
       mtime: stats.mtime.getTime()
     }
-    return this.forest.createRoot(uuid, xstat)
+    let drv = this.drives.find(d => d.uuid === uuid)
+    return this.forest.createRoot(uuid, xstat, drv && drv.type === 'backup')
   }
 
   removeRoot (uuid) {
@@ -234,6 +238,12 @@ class VFS extends EventEmitter {
     return drive && this.userCanWriteDrive(user, drive)
   }
 
+  isBackupDrive(driveUUID) {
+    let index = this.drives.findIndex(x => x.uuid === driveUUID)
+    if (index === -1) return false
+    let drv = this.drives[index]
+    return drv.type === 'backup'
+  }
 
   TMPFILE () {
     return path.join(this.tmpDir, UUID.v4())
@@ -308,7 +318,7 @@ class VFS extends EventEmitter {
     }
      
     // TODO it is possible that dir root is changed during read 
-    dir.read((err, entries) => {
+    dir.read((err, entries, whiteout) => {
       if (err) {
         err.status = 500
         callback(err)
@@ -317,7 +327,11 @@ class VFS extends EventEmitter {
           uuid: dir.uuid,
           name: dir.name,
           mtime: Math.abs(dir.mtime)
-        })) 
+        }))
+        // backup add
+        if (Array.isArray(whiteout)) {
+          whiteout.forEach(w => entries.push(Object.assign({}, w, { deleted: true })))
+        }
         callback(null, { path, entries })
       }
     })
@@ -405,29 +419,12 @@ class VFS extends EventEmitter {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
       if (!props.policy) props.policy = [null, null]
-      if (props.metadata && dir.uuid !== props.driveUUID) {
-        return callback(new Error('metadata dir must be sub folder for drive'), { status: 400 })
-      }
       let target = path.join(this.absolutePath(dir), props.name)
       /**
       FIXME: This function is problematic. readXattr may race!
       */
       mkdir(target, props.policy, (err, xstat, resolved) => {
         if (err) return callback(err)
-        if (props.uptype === 'backup') {
-          try {
-            let attr = JSON.parse(xattr.getSync(target, 'user.fruitmix'))
-            attr.metadata = props.metadata
-            attr.bctime = props.bctime
-            attr.bmtime = props.bmtime
-            xattr.setSync(target, 'user.fruitmix', JSON.stringify(attr))
-          } catch(e) {
-            return callback(e)
-          }
-          xstat.metadata = props.metadata
-          xstat.bctime = props.bctime
-          xstat.bmtime = props.bmtime
-        }
         // this only happens when skip diff policy taking effect
         if (!xstat) return callback(null, null, resolved)
         if (!props.read) return callback(null, xstat, resolved)
@@ -524,9 +521,6 @@ class VFS extends EventEmitter {
   @param {string} props.sha256 - file hash (fingerprint)
   */
   NEWFILE (user, props, callback) {
-    if (props.uptype === 'backup') {
-      return this.BACKUP_NEWFILE(user, props, callback)
-    }
     let { name, data, size, sha256, uptype } = props
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
@@ -534,28 +528,6 @@ class VFS extends EventEmitter {
       let target = path.join(this.absolutePath(dir), props.name)
       mkfile(target, props.data, props.sha256 || null, props.policy, callback)
     }) 
-  }
-
-  BACKUP_NEWFILE (user, props, callback) {
-    // TODO: validate bfilename bctime bmtime
-    let { name, data, sha256, bfilename, bctime, bmtime, driveUUID } = props
-    let drive = this.drives.find(d => d.uuid === driveUUID)
-    if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
-    if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
-    this.DIR(user, props, (err, dir) => {
-      if (err) return callback(err)
-      if (dir.deleted) return callback(Object.assign(new Error('dir not found'), { status: 404 }))
-      let target = path.join(this.absolutePath(dir), name)
-      forceXstat(data, {
-        bfilename, bctime, bmtime, hash: sha256 || null
-      }, (err, xstat) => {
-        if (err) return callback(err)
-        fs.rename(data, target, err => {
-          if (err) return callback(err)
-          return callback(null, xstat)
-        })
-      })
-    })
   }
 
   /**
@@ -651,75 +623,6 @@ class VFS extends EventEmitter {
   
   */
   DUP (user, props, callback) {
-  }
-
-  // only use for backup drive when user had delete local file/folder
-  BACKUP_ARCHIVE(user, props, callback) {
-    let { driveUUID } = props
-    let specified = this.drives.find(d => d.uuid === driveUUID)
-    if (!specified || specified.isDeleted || !this.userCanWriteDrive(user, specified) || specified.type !== 'backup') {
-      let err = new Error('drive not found')
-      err.status = 404
-      return process.nextTick(() => callback(err))
-    }
-    this.DIR(user, props, (err, dir) => {
-      if (err) return callback(err)
-      let { name } = props
-      let dstPath = path.join(this.absolutePath(dir), name)
-      if (err) return callback(err)
-      try {
-        let attr = JSON.parse(xattr.getSync(dstPath, 'user.fruitmix'))
-        attr.archived = true
-        xattr.setSync(dstPath, 'user.fruitmix', JSON.stringify(attr))
-        return dir.read(callback)
-      } catch (e) { callback(e)}
-    })
-  }
-
-  // only use for backup drive when user want delete backup file/folder
-  BACKUP_DELETE(user, props, callback) {
-    let { driveUUID } = props
-    let specified = this.drives.find(d => d.uuid === driveUUID)
-    if (!specified || specified.isDeleted || !this.userCanWriteDrive(user, specified) || specified.type !== 'backup') {
-      let err = new Error('drive not found')
-      err.status = 404
-      return process.nextTick(() => callback(err))
-    }
-    this.DIR(user, props, (err, dir) => {
-      if (err) return callback(err)
-      let { name } = props
-      let dstPath = path.join(this.absolutePath(dir), name)
-      fs.lstat(dstPath, (err, stat) => {
-        if (err) return callback(err)
-        if (stat.isDirectory()) {
-          let tmpDir = path.join(this.tmpDir, UUID.v4())
-          try {
-            mkdirp.sync(tmpDir)
-            let attr = JSON.parse(xattr.getSync(dstPath, 'user.fruitmix'))
-            attr.deleted = true
-            xattr.setSync(tmpDir, 'user.fruitmix', JSON.stringify(attr))
-            rimraf.sync(dstPath)
-            child.execSync(`mv ${ tmpDir } ${ dstPath }`)
-            return dir.read(callback)
-          } catch (e) {
-            return callback(e)
-          }
-        } else {
-          try {
-            let tmpFile = this.TMPFILE()
-            fs.createWriteStream(tmpFile).end()
-            let attr = JSON.parse(xattr.getSync(dstPath, 'user.fruitmix'))
-            attr.deleted = true
-            attr.hash = undefined
-            xattr.setSync(tmpFile, 'user.fruitmix', JSON.stringify(attr))
-            fs.renameSync(tmpFile, dstPath)
-            return dir.read(callback)
-          } catch (e) {
-            return callback(e)
-          }
-        }
-      })
-    })
   }
 
   /**
@@ -867,7 +770,8 @@ class VFS extends EventEmitter {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       let { name } = props
-
+      console.log(dir, props)
+      console.log(this.absolutePath(dir))
       let filePath = path.join(this.absolutePath(dir), name)
       fs.lstat(filePath, (err, stat) => {
         if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) err.status = 404

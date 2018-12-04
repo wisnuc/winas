@@ -177,11 +177,12 @@ class Heading extends State {
       }
 
       if (!isNonNullObject(filename) || Array.isArray(filename)) throw new Error('invalid filename field')
-      let { op, hash, size, sha256, policy, uptype, bfilename, bctime, bmtime } = filename 
+      let { op, hash, size, sha256, policy } = filename
+      let { uptype, bname, bctime, bmtime, archived} = filename // backup add
       if (op === 'newfile') {
-        Object.assign(this.ctx.args, { op, size, sha256, policy, uptype, bfilename, bctime, bmtime })
+        Object.assign(this.ctx.args, { op, size, sha256, policy, uptype, bname, bctime, bmtime, archived })
       } else if (op = 'append') {
-        Object.assign(this.ctx.args, { op, hash, size, sha256, uptype, bfilename, bctime, bmtime })
+        Object.assign(this.ctx.args, { op, hash, size, sha256, uptype, bname, bctime, bmtime, archived })
       } else {
         Object.assign(this.ctx.args, { op, hash, size, sha256, policy })
       }
@@ -254,7 +255,8 @@ class Parsing extends State {
         return this.setState(Failed, e)
       }
 
-      let { op, policy, tags, uuid, metadata, uptype } = body
+      let { op, policy, tags, uuid } = body
+      let { uptype, bname, bmtime, bctime, hash, archived, deleted, metadata } = body // backup added
 
       try {
         if (op === 'mkdir' || op === 'rename' || op === 'dup') {
@@ -266,17 +268,20 @@ class Parsing extends State {
             if (this.ctx.args.fromName === this.ctx.args.toName) throw new Error('two distinct names required')
           }
 
-          if (op === 'mkdir' && uptype === 'backup') {
-            Object.assign(this.ctx.args, { uptype, metadata })
+          if (op === 'mkdir') { // backup added
+            Object.assign(this.ctx.args, { uptype, metadata, bname, bmtime, bctime, archived, uuid })
+            if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
           } 
-
-        } else if (op === 'remove' || op === 'archive' || op === 'delete') {
-          Object.assign(this.ctx.args, { op, uuid })
+        } else if (op === 'remove' || op === 'archive') {
+          Object.assign(this.ctx.args, { op, uuid, hash })
           if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
         } else if (op === 'addTags' || op === 'removeTags' || op === 'setTags') {
           Object.assign(this.ctx.args, { op, tags })
           if (!Array.isArray(tags) || !tags.every(id => Number.isInteger(id))) throw new Error('invalid tags')
-        } else {
+        } else if (op === 'updateAttr') {
+          Object.assign(this.ctx.args, { op, uuid, hash, archived, deleted, bname, bctime, bmtime, metadata })
+          if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
+        }else {
           Object.assign(this.ctx.args, { op, policy, uuid, tags })
           throw new Error('invalid op')
         }
@@ -398,10 +403,9 @@ class Executing extends State {
             size: args.size,
             sha256: args.sha256,
             policy: args.policy,
-            bfilename: args.bfilename,
+            bname: args.bname,
             bctime: args.bctime,
-            bmtime: args.bmtime,
-            uptype: args.uptype
+            bmtime: args.bmtime
           }, (err, xstat, resolved) => {
             if (err) {
               this.setState(Failed, err)
@@ -419,7 +423,7 @@ class Executing extends State {
             data: args.data,
             size: args.size,
             sha256: args.sha256,
-            bfilename: args.bfilename,
+            bname: args.bname,
             bctime: args.bctime,
             bmtime: args.bmtime
           }, (err, xstat) => {
@@ -441,7 +445,8 @@ class Executing extends State {
             name: args.toName,
             policy: args.policy,
             metadata: args.metadata,
-            uptype: args.uptype
+            bctime: args.bctime,
+            bmtime: args.bmtime
           }, (err, xstat, resolved) => {
             if (err) {
               this.setState(Failed, err)
@@ -455,7 +460,9 @@ class Executing extends State {
         case 'remove':
           this.ctx.ctx.apis.remove({
             name: args.toName,
-            uuid: args.uuid
+            uuid: args.uuid,
+            hash: args.hash,
+            fileUUID: args.uuid
           }, err => err 
             ? this.setState(Failed, err) 
             : this.setState(Succeeded, null))
@@ -464,15 +471,9 @@ class Executing extends State {
         case 'archive':
           this.ctx.ctx.apis.archive({
             name: args.toName,
-            uuid: args.uuid
-          }, err => err 
-            ? this.setState(Failed, err) 
-            : this.setState(Succeeded, null))
-          break
-        case 'delete':
-          this.ctx.ctx.apis.delete({
-            name: args.toName,
-            uuid: args.uuid
+            uuid: args.uuid,
+            fileUUID: args.uuid,
+            hash: args.hash
           }, err => err 
             ? this.setState(Failed, err) 
             : this.setState(Succeeded, null))
@@ -491,7 +492,20 @@ class Executing extends State {
             }
           })
           break
-
+        case 'updateAttr':
+          this.ctx.ctx.apis.updateAttr({
+            name: args.toName,
+            uuid: args.uuid,
+            fileUUID: args.uuid,
+            hash: args.hash,
+            bname: args.bname,
+            bctime: args.bctime,
+            bmtime: args.bmtime,
+            metadata: args.metadata
+          }, err => err 
+            ? this.setState(Failed, err) 
+            : this.setState(Succeeded, null))
+          break
         case 'addTags': 
           this.ctx.ctx.apis.addTags({ 
             name: args.name,

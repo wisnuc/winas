@@ -24,21 +24,22 @@ class Base {
   exit () {
   }
 
-  setState (NextState, ...args) {
+  setState (nextState, ...args) {
     this.exit()
+    let NextState = this.dir[nextState]
     new NextState(this.dir, ...args)
   }
 
   readi () {
-    this.setState(Reading)
+    this.setState('Reading')
   }
 
   readn (delay) {
-    this.setState(Pending, delay)
+    this.setState('Pending', delay)
   }
 
   readc (callback) {
-    this.setState(Reading, [callback])
+    this.setState('Reading', [callback])
   }
 
   destroy () {
@@ -555,9 +556,9 @@ class Directory extends Node {
   }
 }
 
-Directory.Init = Init
-Directory.Idle = Idle
-Directory.Pending = Pending
-Directory.Reading = Reading
+Directory.prototype.Init = Init
+Directory.prototype.Idle = Idle
+Directory.prototype.Pending = Pending
+Directory.prototype.Reading = Reading
 
 module.exports = Directory
