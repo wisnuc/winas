@@ -19,8 +19,8 @@ class Reading extends Directory.prototype.Reading {
     this.readdir = readdir(dirPath, uuid, _mtime, (err, obj, mtime, transient) => {
       // change to debug
       debug('breaddir done', err || (obj && obj.living ? obj.living.length : obj.living), mtime, transient)
-      let xstats = obj.living
-      let whiteout = obj.whiteout
+      
+      let xstats, whiteout
 
       if (dirPath !== this.dir.abspath()) {
         err = new Error('path changed during readdir operation')
@@ -40,7 +40,10 @@ class Reading extends Directory.prototype.Reading {
           console.log('readdir error', err.message)
           this.readn(1000)
         }
-      } else if (xstats) {
+      } else if (obj.living) {
+
+        xstats = obj.living
+        whiteout = obj.whiteout
         /**
         Don't bypass update children! Do it anyway. Node.js fs timestamp resolution is not adequate.
         */
