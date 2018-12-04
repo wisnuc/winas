@@ -119,6 +119,8 @@ class BACKUP {
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     if (hash && fileUUID) {
       return this.updateFile(user, props, callback)
+    } else {
+      return this.updateDir(user, props, callback)
     }
   }
 
@@ -132,10 +134,10 @@ class BACKUP {
   }
 
   updateDir(user, props, callback) {
-    this.props.dirUUID = props.uuid
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
-      fileAttr.updateDirAttr(dir.abspath(), props, callback)
+      if (dir.root().uuid !== dir.uuid) delete props.metadata // not support
+      fileAttr.updateDirAttr(path.join(dir.abspath(), props.name), props, callback)
     })
   }
 

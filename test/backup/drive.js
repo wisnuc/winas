@@ -184,7 +184,6 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-  /*
   it('delete pngfile1', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
@@ -211,6 +210,72 @@ describe(path.basename(__filename) + ', Alice only', () => {
       })
   })
 
+  it('update pngfile2', done => {
+    request(app.express)
+      .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
+      .set('Authorization', 'JWT ' + token)
+      .field('hello', JSON.stringify({ op: 'updateAttr', uuid: pngfile2.uuid, hash: pngfile2.hash, bctime: 2222222, bmtime: 3333333 }))
+      .expect(200)
+      .end((err, res) => {
+        if (err) return done(err)
+        console.log(res.body)
+        done()
+      })
+  })
+
+  it('update pdf', done => {
+    request(app.express)
+      .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
+      .set('Authorization', 'JWT ' + token)
+      .field('hello', JSON.stringify({ op: 'updateAttr', uuid: pdffile.uuid, hash: pdffile.hash, bctime: 2222222, bmtime: 3333333 }))
+      .expect(200)
+      .end((err, res) => {
+        if (err) return done(err)
+        console.log(res.body)
+        done()
+      })
+  })
+
+  it('get second dir', done => {
+    request(app.express)
+      .get(`/drives/${drive.uuid}/dirs/${second.uuid}`)
+      .set('Authorization', 'JWT ' + token)
+      .expect(200)
+      .end((err, res) => {
+        console.log(err)
+        if (err) return done(err)
+        console.log(res.body)
+        done()
+      })
+  })
+
+  it('update second', done => {
+    request(app.express)
+      .post(`/drives/${drive.uuid}/dirs/${topdir.uuid}/entries`)
+      .set('Authorization', 'JWT ' + token)
+      .field('hello', JSON.stringify({ op: 'updateAttr', bctime: 2222222, bmtime: 3333333 }))
+      .expect(200)
+      .end((err, res) => {
+        if (err) return done(err)
+        console.log(res.body)
+        done()
+      })
+  })
+
+  it('get top dir', done => {
+    request(app.express)
+      .get(`/drives/${drive.uuid}/dirs/${topdir.uuid}`)
+      .set('Authorization', 'JWT ' + token)
+      .expect(200)
+      .end((err, res) => {
+        console.log(err)
+        if (err) return done(err)
+        console.log(res.body)
+        done()
+      })
+  })
+
+  /*
   it('delete pngfile1 return 500', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
