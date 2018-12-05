@@ -78,8 +78,9 @@ class BACKUP {
   }
 
   mkdir(user, props, callback){
-    let { metadata, bctime, bmtime, name, driveUUID } = props
+    let { metadata, bctime, bmtime, name, driveUUID, archived } = props
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
+    if (archived && typeof archived !== 'boolean') return process.nextTick(() => callback(new Error('archived must type of boolean')))
     if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.vfs.DIR(user, props, (err, dir) => {
@@ -94,7 +95,7 @@ class BACKUP {
         metadata = undefined
       }
       let target = path.join(dir.abspath(), dirname)
-      fileAttr.createDir(target, { metadata, uuid, bctime, bmtime, bname:name }, callback)
+      fileAttr.createDir(target, { metadata, uuid, bctime, bmtime, bname:name, archived }, callback)
     })
   }
 
@@ -117,7 +118,7 @@ class BACKUP {
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
     if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
-    if (!this.vfs.userCanWriteDrive(user, driveUUID))
+    if (!this.vfs.userCanWriteDrive(user, drive))
       return process.nextTick(() => callback(new Error('Permission Denied')))
     if (hash && fileUUID) {
       return this.updateFile(user, props, callback)
