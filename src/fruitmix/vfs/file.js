@@ -53,7 +53,8 @@ class FileState {
 
   setState(NextState) {
     this.exit()
-    new NextState(this.file)
+    let Next = this.file[NextState]
+    new Next(this.file)
   }
 
   updateName () {}
@@ -95,13 +96,13 @@ class Hashing extends FileState {
       if (err) {
         this.file.hashFail = (this.file.hashFail || 0) + 1
         if (this.file.hashFail > 3) {
-          this.setState(HashFailed)
+          this.setState('HashFailed')
         } else {
-          this.setState(Hashless)
+          this.setState('Hashless')
         }
       } else {
         this.file.hash = xstat.hash 
-        this.setState(Hashed)
+        this.setState('Hashed')
       }
     })
   }
@@ -231,15 +232,15 @@ class File extends Node {
   setState (State) {
     // currently, only Hashless -> Hashing is allowed to be set from outside
     assert(this.state instanceof Hashless)
-    assert(State === Hashing)
+    assert(State === 'Hashing')
     this.state.setState(State)
   }
 
 }
 
-File.Hashless = Hashless
-File.Hashing = Hashing
-File.HashFailed = HashFailed
-File.Hashed = Hashed
+File.prototype.Hashless = Hashless
+File.prototype.Hashing = Hashing
+File.prototype.HashFailed = HashFailed
+File.prototype.Hashed = Hashed
 
 module.exports = File

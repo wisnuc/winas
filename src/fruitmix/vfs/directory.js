@@ -330,12 +330,6 @@ class Directory extends Node {
     this.name = xstat.name
     this.mtime = -xstat.mtime
 
-    this.archived = xstat.archived
-    this.deleted = xstat.deleted
-    this.metadata = xstat.metadata
-    this.bctime = xstat.bctime
-    this.bmtime = xstat.bmtime
-
     this.fileSize = 0
     this.fileCount = 0
     this.dirCount = 0

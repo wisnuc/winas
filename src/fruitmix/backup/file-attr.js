@@ -52,15 +52,26 @@ const updateDirAttr = (target, props, callback) => {
     }
   })
 }
-//fix
+
 const updateFileAttr = (dirPath, hash, fileUUID, props, callback) => {
-  let { bctime, bmtime, bname, archived } = props || {}
+  let { bctime, bmtime, bname, archived, desc } = props || {}
   let attr = {}
+  if (bname && !isNonEmptyString(bname)) 
+    return process.nextTick(() => callback(EINVAL('invalid bname')))
+  if (bctime && !Number.isInteger(bctime))
+    return process.nextTick(() => callback(EINVAL('invalid bctime')))
+  if (bmtime && !Number.isInteger(bmtime))
+    return process.nextTick(() => callback(EINVAL('invalid bmtime')))
+  if (desc && (!isNonEmptyString(desc) || desc.length > 140))
+    return process.nextTick(() => callback(EINVAL('invalid desc')))
+  if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
+  else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
+  
   if (bctime) attr.bctime = bctime
   if (bmtime) attr.bmtime = bmtime
   if (bname) attr.bname
-  if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
-  else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
+  if (desc) attr.desc = desc
+  
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
     let index = attrs.attrs.findIndex(x => x.uuid === fileUUID)
@@ -85,7 +96,7 @@ const updateFileAttr = (dirPath, hash, fileUUID, props, callback) => {
     }
   })
 }
-//fix
+
 const deleteFileAttr = (dirPath, hash, fileUUID, callback) => {
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
@@ -114,9 +125,10 @@ const createDir = (target, attrs, callback) => {
     let tmpDir = path.join(global.TMPDIR(), UUID.v4())
     fs.mkdir(tmpDir, err => {
       if (err) return cb(err)
-      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived }, err => {
+      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived }, (err, xstat) => {
         if (err) return cb(err)
-        fs.rename(tmpDir, target, err => err ? cb(err) : cb(null, { uuid, metadata, bctime, bmtime, bname }))
+        xstat.name = path.basename(target)
+        fs.rename(tmpDir, target, err => err ? cb(err) : cb(null, xstat))
       })
     })
   }
@@ -148,9 +160,9 @@ const createDir = (target, attrs, callback) => {
     }
   })
 }
-//fix
+
 const createFile = (tmp, dirPath, hash, attrs, callback) => {
-  let { uuid, archived, bctime, bmtime, fingerprint, bname } = attrs
+  let { uuid, archived, bctime, bmtime, fingerprint, bname, desc } = attrs
   if (attrs.name && !bname) bname = attrs.name
   if (typeof archived === 'boolean') archived = archived ? true : undefined
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
@@ -158,17 +170,17 @@ const createFile = (tmp, dirPath, hash, attrs, callback) => {
   fs.link(tmp, target, err => {
     if (!err || (err && err.code === 'EEXIST')) {
       // ignore EEXIST error
-      let attr = { uuid, archived, bname, bctime, bmtime, fingerprint }
+      let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
       createFileAttr(dirPath, hash, attr, callback)
     } else {
       callback(err)
     }
   })
 }
-//fix
+
 const createFileAttr = (dirPath, hash, props, callback) => {
 
-  let { uuid, archived, bname, bctime, bmtime, fingerprint } = props || {}
+  let { uuid, archived, bname, bctime, bmtime, fingerprint, desc } = props || {}
 
   let targetPath = path.join(dirPath,'.xattr.' + hash)
 
@@ -192,17 +204,20 @@ const createFileAttr = (dirPath, hash, props, callback) => {
     return process.nextTick(() => callback(EINVAL('invalid bctime')))
   if (bmtime && !Number.isInteger(bmtime))
     return process.nextTick(() => callback(EINVAL('invalid bmtime')))
+  if (desc && (!isNonEmptyString(desc) || desc.length > 140))
+    return process.nextTick(() => callback(EINVAL('invalid desc')))
 
   fs.lstat(targetPath, (err, stat) => {
     if (err && err.code === 'ENOENT') {
-      let attrs = { attrs: [{ uuid, archived, bname, bctime, bmtime, fingerprint }] }
+      let orig = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
+      let attrs = { attrs: [orig] }
       write(attrs, targetPath, true, null, err => { // use hard link to skip rename race
         if (err && err.code === 'EEXIST') {
           createFileAttr(dirPath, hash, props, callback) // race, retry
         } else if (err) {
           callback(err)
         } else
-          callback(null, { uuid, archived, bname, bctime, bmtime, fingerprint })
+          callback(null, orig)
       })
     } else if (err) {
       callback(err)
@@ -210,7 +225,7 @@ const createFileAttr = (dirPath, hash, props, callback) => {
       let mtime = stat.mtime.getTime()
       readFileAttrs(dirPath, hash, (err, data) => {
         if (err) return callback(err)
-        let attr = { uuid, archived, bname, bctime, bmtime, fingerprint }
+        let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
         if (Array.isArray(data.attrs)) {
           data.attrs.push(attr)
           write(data, targetPath, false, mtime, err => err ? callback(err) : callback(null, attr))
@@ -251,7 +266,7 @@ const createWhiteout = (dirPath, props, callback) => {
     }
   })
 }
-//fix
+
 const createFileXstat = (target, stats, attr) => {
   let name = path.basename(target)
   let xstat = {
@@ -268,7 +283,7 @@ const createFileXstat = (target, stats, attr) => {
     delete metadata.ver
     xstat.metadata = metadata
   }
-
+  if (attr.desc) xstat.desc = desc
   if (attr.bname) {// replace name
     xstat.name = attr.bname
     xstat.bname = attr.bname
@@ -280,7 +295,7 @@ const createFileXstat = (target, stats, attr) => {
   return xstat
 }
 
-//fix
+
 const createFileXstats = (target, stats, attrs, metadata) => {
   let xstats = []
   attrs.forEach(a => {
@@ -333,7 +348,7 @@ const updateFileMeta = (dirPath, hash, attrs, callback) => {
     }
   })
 }
-//fixed
+
 const readFileXstats = (dirPath, hash, callback) => {
   fs.lstat(path.join(dirPath, hash), (err, stats) => {
     if (err) return callback(err)

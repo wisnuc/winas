@@ -282,7 +282,7 @@ class Forest extends EventEmitter {
 
     while (this.hashlessFiles.size > 0 && this.hashingFiles.size < 2) {
       let file = this.hashlessFiles[Symbol.iterator]().next().value
-      file.setState(File.Hashing)
+      file.setState('Hashing')
     } 
   }
 

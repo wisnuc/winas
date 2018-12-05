@@ -1,7 +1,7 @@
 const Directory = require('../vfs/directory')
-const File = require('../vfs/file')
+const File = require('./file')
 const readdir = require('./readdir')
-const debug = require('debug')('ws:backup')
+const debug = require('debug')('ws:backup-dir')
 
 class Reading extends Directory.prototype.Reading {
   
@@ -126,6 +126,16 @@ class Reading extends Directory.prototype.Reading {
 }
 
 class BDirectory extends Directory {
+
+  constructor(ctx, parent, xstat) {
+    super(ctx, parent, xstat)
+
+    this.archived = xstat.archived
+    this.deleted = xstat.deleted
+    this.metadata = xstat.metadata
+    this.bctime = xstat.bctime
+    this.bmtime = xstat.bmtime
+  }
   
 }
 
