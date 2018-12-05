@@ -113,6 +113,10 @@ class BACKUP {
     })
   }
 
+  rename(user, props, callback) {
+    callback(Object.assign(new Error('unsupport'), { code: 400 }))
+  }
+
   updateAttr(user, props,callback) {
     let { driveUUID, hash, fileUUID, name } = props || {}
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)

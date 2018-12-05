@@ -773,10 +773,12 @@ class VFS extends EventEmitter {
   DIRENTRY_GET (user, props, callback) {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
-      let { name } = props
+      let { name, hash } = props
+      let filename = this.isBackupDrive(props.driveUUID) ? hash : name
+      if (!filename) return callback(Object.assign(new Error('filename not found'), { status: 404 }))
       console.log(dir, props)
       console.log(this.absolutePath(dir))
-      let filePath = path.join(this.absolutePath(dir), name)
+      let filePath = path.join(this.absolutePath(dir), filename)
       fs.lstat(filePath, (err, stat) => {
         if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) err.status = 404
         callback(err, filePath)
@@ -831,7 +833,7 @@ class VFS extends EventEmitter {
   */
   filePath (driveUUID, dirUUID, name) {
     let dirPath = this.directoryPath(driveUUID, dirUUID)
-
+    
     if (!dirPath) return
 
     return path.join(dirPath, name)

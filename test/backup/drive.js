@@ -144,7 +144,7 @@ describe(path.basename(__filename) + ', Alice only', () => {
       })
   })
 
-  it('should fail 400 if size not provided, cfd1934f', done => {
+  it('upload', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
       .set('Authorization', 'JWT ' + token)
@@ -171,7 +171,7 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-
+  /*
   it('upload pdf', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)

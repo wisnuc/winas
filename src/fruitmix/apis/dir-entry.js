@@ -33,6 +33,9 @@ class DirEntryApi {
 
   rename (user, dirProps, dataProps, callback) {
     let props = Object.assign({}, dataProps, dirProps)
+    if (this.vfs.isBackupDrive(dirProps.driveUUID)) {
+      return this.vfs.backup.rename(user, props, callback)
+    }
     this.vfs.RENAME(user, props, callback)
   }
 

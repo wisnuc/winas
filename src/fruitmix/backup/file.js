@@ -1,5 +1,6 @@
 const File = require('../vfs/file')
 const debug = require('debug')('ws:backup-file')
+const path = require('path')
 
 class BFile extends File {
   /**
