@@ -91,6 +91,20 @@ describe(path.basename(__filename) + ', Alice only', () => {
       })
   })
 
+  it('get top dir', done => {
+    request(app.express)
+      .get(`/drives/${drive.uuid}/dirs/${topdir.uuid}`)
+      .set('Authorization', 'JWT ' + token)
+      .expect(200)
+      .end((err, res) => {
+        console.log(err)
+        if (err) return done(err)
+        console.log(res.body)
+        // second = res.body.entries[0]
+        done()
+      })
+  })
+  
   it('make second layer dir', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${topdir.uuid}/entries`)

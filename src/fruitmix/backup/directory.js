@@ -19,7 +19,7 @@ class Reading extends Directory.prototype.Reading {
     this.readdir = readdir(dirPath, uuid, _mtime, (err, obj, mtime, transient) => {
       // change to debug
       debug('breaddir done', err || (obj && obj.living ? obj.living.length : obj.living), mtime, transient)
-      
+
       let xstats, whiteout
 
       if (dirPath !== this.dir.abspath()) {

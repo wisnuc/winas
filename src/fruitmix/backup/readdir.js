@@ -29,7 +29,7 @@ const readdir = (dirPath, uuid, mtime, callback) => {
             } else if (x2.uuid !== uuid) {
               callback(Object.assign(new Error('uuid mismatch'), { code: 'EINSTANTCE' }))
             } else {
-              callback(null, [], x2.mtime, x2.mtime !== x1.mtime)
+              callback(null, { living:[], whiteout:[] }, x2.mtime, x2.mtime !== x1.mtime)
             }
           })
         } else {
