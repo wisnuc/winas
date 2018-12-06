@@ -18,7 +18,7 @@ class Reading extends Directory.prototype.Reading {
 
     this.readdir = readdir(dirPath, uuid, _mtime, (err, obj, mtime, transient) => {
       // change to debug
-      debug('breaddir done', err || (obj && obj.living ? obj.living.length : obj.living), mtime, transient)
+      debug('breaddir done', err || (obj && obj.living ? obj.living.length : obj), mtime, transient)
 
       let xstats, whiteout
 
@@ -40,7 +40,7 @@ class Reading extends Directory.prototype.Reading {
           console.log('readdir error', err.message)
           this.readn(1000)
         }
-      } else if (obj.living) {
+      } else if (obj && obj.living) {
 
         xstats = obj.living
         whiteout = obj.whiteout
