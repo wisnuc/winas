@@ -44,7 +44,8 @@ const _updateDirAttr = ({ target, props }, callback) => {
   if (bctime) attr.bctime = bctime
   if (bmtime) attr.bmtime = bmtime
   if (metadata) attr.metadata = metadata
-  if (bname) attr.bname
+  // skip bname property update
+  // if (bname) attr.bname 
   
   if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
@@ -141,6 +142,7 @@ const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
   })
 }
 
+// bname can not update
 const _createDir = ({ target, attrs }, callback) => {
   let { uuid, metadata, bctime, bmtime, bname} = attrs
   if (typeof attrs.archived === 'boolean') attrs.archived = archived ? true : undefined // convert archived

@@ -135,6 +135,7 @@ class BDirectory extends Directory {
     this.metadata = xstat.metadata
     this.bctime = xstat.bctime
     this.bmtime = xstat.bmtime
+    this.bname = xstat.bname
   }
   
 }

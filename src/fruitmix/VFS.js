@@ -292,6 +292,11 @@ class VFS extends EventEmitter {
   dirGET (user, props, callback) {
     let dir, root, drive
 
+    //backup add
+    if (this.isBackupDrive(props.driveUUID))
+      return this.backup.dirGET(user, props, callback)
+    //backup end
+
     // find dir
     dir = this.forest.uuidMap.get(props.dirUUID)
     if (!dir) {
@@ -332,10 +337,6 @@ class VFS extends EventEmitter {
           name: dir.name,
           mtime: Math.abs(dir.mtime)
         }))
-        // backup add
-        if (Array.isArray(whiteout)) {
-          whiteout.forEach(w => entries.push(Object.assign({}, w, { deleted: true })))
-        }
         callback(null, { path, entries })
       }
     })
