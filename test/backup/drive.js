@@ -158,11 +158,14 @@ describe(path.basename(__filename) + ', Alice only', () => {
       })
   })
 
-  it('upload', done => {
+  it('upload 4', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
       .set('Authorization', 'JWT ' + token)
       .attach('l.jpg', 'testdata/l.png', JSON.stringify({ op:'newfile', size:13377, sha256: '8e0f501f838d32d93f2217dd49dcb1e88c19bcf2c5170d53f667f8bc15a062bb', bctime: 1555555, bmtime:155555 }))
+      .attach('3.jpg', 'testdata/l.png', JSON.stringify({ op:'newfile', size:13377, sha256: '8e0f501f838d32d93f2217dd49dcb1e88c19bcf2c5170d53f667f8bc15a062bb', bctime: 1555555, bmtime:155555 }))
+      .attach('5.jpg', 'testdata/l.png', JSON.stringify({ op:'newfile', size:13377, sha256: '8e0f501f838d32d93f2217dd49dcb1e88c19bcf2c5170d53f667f8bc15a062bb', bctime: 1555555, bmtime:155555 }))
+      .attach('1.jpg', 'testdata/l.png', JSON.stringify({ op:'newfile', size:13377, sha256: '8e0f501f838d32d93f2217dd49dcb1e88c19bcf2c5170d53f667f8bc15a062bb', bctime: 1555555, bmtime:155555 }))
       .expect(200)
       .end((err, res) => {
         if (err) return done(err)
@@ -171,7 +174,7 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-  /*
+
   it('upload pdf', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
@@ -289,7 +292,7 @@ describe(path.basename(__filename) + ', Alice only', () => {
       })
   })
 
-  /*
+  
   it('delete pngfile1 return 500', done => {
     request(app.express)
       .post(`/drives/${drive.uuid}/dirs/${second.uuid}/entries`)
@@ -341,5 +344,5 @@ describe(path.basename(__filename) + ', Alice only', () => {
         done()
       })
   })
-  */
+  
 })

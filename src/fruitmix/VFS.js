@@ -776,8 +776,8 @@ class VFS extends EventEmitter {
       let { name, hash } = props
       let filename = this.isBackupDrive(props.driveUUID) ? hash : name
       if (!filename) return callback(Object.assign(new Error('filename not found'), { status: 404 }))
-      console.log(dir, props)
-      console.log(this.absolutePath(dir))
+      // console.log(dir, props)
+      // console.log(this.absolutePath(dir))
       let filePath = path.join(this.absolutePath(dir), filename)
       fs.lstat(filePath, (err, stat) => {
         if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) err.status = 404

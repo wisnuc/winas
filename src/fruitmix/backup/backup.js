@@ -19,33 +19,35 @@ class BACKUP {
     this.vfs.DIR(user, props, (err, dir) => {
       if (hash || fileUUID) {
         if (hash && fileUUID) { // file
-          return fileAttr.updateFileAttr(dir.abspath(), hash, fileUUID, { archived: true }, callback)
+          let args = { dirPath: dir.abspath(), hash, fileUUID, props: { archived: true } }
+          return fileAttr.updateFileAttr(args, callback)
         } else {
           return callback(new Error('archive file must fileUUID && hash'))
         }
       }
       //dir
-      return fileAttr.updateDirAttr(path.join(dir.abspath(), name), { archived: true }, callback)
+      let args = { target: path.join(dir.abspath(), name), props: { archived: true } }
+      return fileAttr.updateDirAttr(args, callback)
     })
   }
 
-  unarchive(user, props, callback) {
-    let { hash, fileUUID, name, driveUUID } = props
-    let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
-    if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
-    if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
-    this.vfs.DIR(user, props, (err, dir) => {
-      if (hash || fileUUID) {
-        if (hash && fileUUID) { // file
-          return fileAttr.updateFileAttr(dir.abspath(), hash, fileUUID, { archived: false }, callback)
-        } else {
-          return callback(new Error('archive file must fileUUID && hash'))
-        }
-      }
-      //dir
-      return fileAttr.updateDirAttr(path.join(dir.abspath(), name), { archived: false }, callback)
-    })
-  }
+  // unarchive(user, props, callback) {
+  //   let { hash, fileUUID, name, driveUUID } = props
+  //   let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
+  //   if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
+  //   if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
+  //   this.vfs.DIR(user, props, (err, dir) => {
+  //     if (hash || fileUUID) {
+  //       if (hash && fileUUID) { // file
+  //         return fileAttr.updateFileAttr(dir.abspath(), hash, fileUUID, { archived: false }, callback)
+  //       } else {
+  //         return callback(new Error('archive file must fileUUID && hash'))
+  //       }
+  //     }
+  //     //dir
+  //     return fileAttr.updateDirAttr(path.join(dir.abspath(), name), { archived: false }, callback)
+  //   })
+  // }
 
   delete(user, props, callback) {
     let { hash, fileUUID, name, driveUUID } = props
@@ -56,15 +58,19 @@ class BACKUP {
       if (err) return callback(err)
       if (hash || fileUUID) {
         if (hash && fileUUID) { // file
-          return fileAttr.deleteFileAttr(dir.abspath(), hash, fileUUID, (err, fattr) => {
+          let args = { dirPath: dir.abspath(), hash, fileUUID }
+          return fileAttr.deleteFileAttr(args, (err, fattr) => {
             if (err) return callback(err)
-            return fileAttr.createWhiteout(dir.abspath(), Object.assign(fattr, { hash }), callback)
+            args = { dirPath: dir.abspath(), props: Object.assign(fattr, { hash }) }
+            return fileAttr.createWhiteout(args, callback)
           })
         } else {
           return callback(new Error('delete file must fileUUID && hash'))
         }
-      } else
-        return fileAttr.updateDirAttr(path.join(dir.abspath(), name), { deleted: true }, callback)
+      } else {
+        let args = { target: path.join(dir.abspath(), name), props: { deleted: true } }
+        return fileAttr.updateDirAttr(args, callback)
+      }
     })
   }
 
@@ -95,7 +101,8 @@ class BACKUP {
         metadata = undefined
       }
       let target = path.join(dir.abspath(), dirname)
-      fileAttr.createDir(target, { metadata, uuid, bctime, bmtime, bname:name, archived }, callback)
+      let args = { target, attrs: { metadata, uuid, bctime, bmtime, bname:name, archived } }
+      fileAttr.createDir(args, callback)
     })
   }
 
@@ -106,7 +113,8 @@ class BACKUP {
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
-      fileAttr.createFile(data, dir.abspath(), sha256, props, (err, data) => {
+      let args = { tmp: data, dirPath: dir.abspath(), hash: sha256, attrs: props }
+      fileAttr.createFile(args, (err, data) => {
         if (err) return callback(err)
         return callback(null, Object.assign(data, { hash: sha256, name: props.name }))
       })
@@ -136,7 +144,8 @@ class BACKUP {
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (name) props.bname = name
-      fileAttr.updateFileAttr(dir.abspath(), hash, fileUUID, props, callback)
+      let args = { dirPath: dir.abspath(), hash, fileUUID, props }
+      fileAttr.updateFileAttr(args, callback)
     })
   }
 
@@ -144,7 +153,8 @@ class BACKUP {
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.root().uuid !== dir.uuid) delete props.metadata // not support
-      fileAttr.updateDirAttr(path.join(dir.abspath(), props.name), props, callback)
+      let args = {  target: path.join(dir.abspath(), props.name), props }
+      fileAttr.updateDirAttr(args, callback)
     })
   }
 
