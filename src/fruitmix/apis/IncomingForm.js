@@ -272,7 +272,7 @@ class Parsing extends State {
             Object.assign(this.ctx.args, { uptype, metadata, bname, bmtime, bctime, archived, uuid })
             if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
           } 
-        } else if (op === 'remove' || op === 'archive') {
+        } else if (op === 'remove') {
           Object.assign(this.ctx.args, { op, uuid, hash })
           if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
         } else if (op === 'addTags' || op === 'removeTags' || op === 'setTags') {
@@ -467,17 +467,7 @@ class Executing extends State {
             ? this.setState(Failed, err) 
             : this.setState(Succeeded, null))
           break
-        
-        case 'archive':
-          this.ctx.ctx.apis.archive({
-            name: args.toName,
-            uuid: args.uuid,
-            fileUUID: args.uuid,
-            hash: args.hash
-          }, err => err 
-            ? this.setState(Failed, err) 
-            : this.setState(Succeeded, null))
-          break
+          
         case 'rename':
           this.ctx.ctx.apis.rename({
             fromName: args.fromName,
@@ -501,7 +491,8 @@ class Executing extends State {
             bname: args.bname,
             bctime: args.bctime,
             bmtime: args.bmtime,
-            metadata: args.metadata
+            metadata: args.metadata,
+            archived: args.archived
           }, err => err 
             ? this.setState(Failed, err) 
             : this.setState(Succeeded, null))

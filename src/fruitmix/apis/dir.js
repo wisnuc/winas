@@ -12,6 +12,10 @@ class DirApi {
   }
 
   GET(user, props, callback) {
+    //backup add
+    if (this.vfs.isBackupDrive(props.driveUUID))
+      return this.vfs.backup.dirGET(user, props, callback)
+    //backup end
     this.vfs.dirGET(user, props, callback)
   }
 

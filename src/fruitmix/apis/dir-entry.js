@@ -26,11 +26,6 @@ class DirEntryApi {
     this.vfs.REMOVE(user, props, callback)
   }
 
-  archive (user, dirProps, dataProps, callback) {
-    let props = Object.assign({}, dataProps, dirProps)
-    this.vfs.backup.archive(user, props, callback)
-  }
-
   rename (user, dirProps, dataProps, callback) {
     let props = Object.assign({}, dataProps, dirProps)
     if (this.vfs.isBackupDrive(dirProps.driveUUID)) {
@@ -80,7 +75,6 @@ class DirEntryApi {
       tmpfile: this.vfs.TMPFILE.bind(this.vfs),
       mkdir: this.mkdir.bind(this, user, dirProps),
       remove: this.remove.bind(this, user, dirProps),
-      archive: this.archive.bind(this, user, dirProps), // backup add
       rename: this.rename.bind(this, user, dirProps),
       newfile: this.newfile.bind(this, user, dirProps),
       append: this.append.bind(this, user, dirProps),

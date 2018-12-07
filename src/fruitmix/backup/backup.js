@@ -11,44 +11,6 @@ class BACKUP {
     this.vfs = vfs
   }
 
-  archive(user, props, callback) {
-    let { hash, fileUUID, name, driveUUID } = props
-    let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
-    if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
-    if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
-    this.vfs.DIR(user, props, (err, dir) => {
-      if (hash || fileUUID) {
-        if (hash && fileUUID) { // file
-          let args = { dirPath: dir.abspath(), hash, fileUUID, props: { archived: true } }
-          return fileAttr.updateFileAttr(args, callback)
-        } else {
-          return callback(new Error('archive file must fileUUID && hash'))
-        }
-      }
-      //dir
-      let args = { target: path.join(dir.abspath(), name), props: { archived: true } }
-      return fileAttr.updateDirAttr(args, callback)
-    })
-  }
-
-  // unarchive(user, props, callback) {
-  //   let { hash, fileUUID, name, driveUUID } = props
-  //   let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
-  //   if (!drive || drive.isDeleted) return process.nextTick(() => callback(new Error('drive not found')))
-  //   if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
-  //   this.vfs.DIR(user, props, (err, dir) => {
-  //     if (hash || fileUUID) {
-  //       if (hash && fileUUID) { // file
-  //         return fileAttr.updateFileAttr(dir.abspath(), hash, fileUUID, { archived: false }, callback)
-  //       } else {
-  //         return callback(new Error('archive file must fileUUID && hash'))
-  //       }
-  //     }
-  //     //dir
-  //     return fileAttr.updateDirAttr(path.join(dir.abspath(), name), { archived: false }, callback)
-  //   })
-  // }
-
   delete(user, props, callback) {
     let { hash, fileUUID, name, driveUUID } = props
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
@@ -68,7 +30,9 @@ class BACKUP {
           return callback(new Error('delete file must fileUUID && hash'))
         }
       } else {
-        let args = { target: path.join(dir.abspath(), name), props: { deleted: true } }
+        // if top dir, force delete without deleted stub
+        let forceDelete = dir.root().uuid === dir.uuid
+        let args = { target: path.join(dir.abspath(), name), props: { deleted: true, forceDelete } }
         return fileAttr.updateDirAttr(args, callback)
       }
     })
@@ -91,6 +55,7 @@ class BACKUP {
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
+      if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
       let uuid, dirname = UUID.v4()
       if (dir.uuid === dir.root().uuid) { // top dir
         metadata = typeof metadata === 'object' ? metadata : {}
@@ -101,7 +66,7 @@ class BACKUP {
         metadata = undefined
       }
       let target = path.join(dir.abspath(), dirname)
-      let args = { target, attrs: { metadata, uuid, bctime, bmtime, bname:name, archived } }
+      let args = { target, attrs: { metadata, uuid, bctime, bmtime, bname:name, archived, deleted: undefined } }
       fileAttr.createDir(args, callback)
     })
   }
@@ -162,12 +127,9 @@ class BACKUP {
   }
 
   /**
-  @param {object} user - user
-  @param {object} props 
-  @param {string} [driveUUID] - drive uuid
-  @param {string} dirUUID - dir uuid
-  @param {string} metadata - true or falsy
-  @param {string} counter - true or falsy
+  @rewrite for backup becouse of paths
+    add
+  @param {boolean} xcopy - true or false - for match xcopy
   */
   dirGET(user, props, callback) {
     let dir, root, drive
@@ -214,12 +176,29 @@ class BACKUP {
           name: dir.bname,
           mtime: Math.abs(dir.mtime)
         }))
-        // backup add
-        if (Array.isArray(whiteout)) {
+        if (!props.xcopy && Array.isArray(whiteout)) {
           whiteout.forEach(w => entries.push(Object.assign({}, w, { deleted: true })))
         }
+
+        if (props.xcopy) {
+          entries.forEach(e => {
+            if (e.type === 'file') {
+              e.namec = e.name
+              e.name = e.hash
+            }
+          })
+        }
+
         callback(null, { path, entries })
       }
+    })
+  }
+
+  READDIR(user, props, callback) {
+    props.xcopy = true
+    this.dirGET(user, props, (err, combined) => {
+      if (err) return callback(err)
+      callback(null, combined.entries)
     })
   }
 

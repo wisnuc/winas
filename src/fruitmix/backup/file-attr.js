@@ -39,20 +39,18 @@ const createAsync = async (fn, args) => {
 }
 
 const _updateDirAttr = ({ target, props }, callback) => {
-  let { bctime, bmtime, metadata, bname, archived, deleted } = props || {}
+  let { bctime, bmtime, metadata, bname, archived, deleted, forceDelete } = props || {}
   let attr = {}
   if (bctime) attr.bctime = bctime
   if (bmtime) attr.bmtime = bmtime
   if (metadata) attr.metadata = metadata
   // skip bname property update
   // if (bname) attr.bname 
-  
   if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
-
   if (typeof deleted === 'boolean') attr.deleted = deleted ? true : undefined
   xattr.get(target, 'user.fruitmix', (err, xa) => { // FIXME: ERACE
-    if (err) return callback(xa)
+    if (err) return callback(err)
     try {
       xa = JSON.parse(xa)
     } catch(e) {
@@ -63,6 +61,7 @@ const _updateDirAttr = ({ target, props }, callback) => {
     if (deleted) {
       rimraf(target, err => {
         if(err) return callback(err)
+        if(forceDelete) return callback(null, xa)
         mkdirp(target, err => {
           if(err) return callback(err)
           xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
@@ -96,7 +95,7 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   if (bmtime) attr.bmtime = bmtime
   if (bname) attr.bname
   if (desc) attr.desc = desc
-  
+  console.log('xxxxxxxxxxxxxxx', props)
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
     let index = attrs.attrs.findIndex(x => x.uuid === fileUUID)
@@ -144,7 +143,7 @@ const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
 
 // bname can not update
 const _createDir = ({ target, attrs }, callback) => {
-  let { uuid, metadata, bctime, bmtime, bname} = attrs
+  let { uuid, metadata, bctime, bmtime, bname, deleted } = attrs
   if (typeof attrs.archived === 'boolean') attrs.archived = archived ? true : undefined // convert archived
   else if (attrs.archived) return callback(new Error('archived must typeof boolean or undefined'))
   let archived = attrs.archived
@@ -152,7 +151,7 @@ const _createDir = ({ target, attrs }, callback) => {
     let tmpDir = path.join(global.TMPDIR(), UUID.v4())
     fs.mkdir(tmpDir, err => {
       if (err) return cb(err)
-      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived }, (err, xstat) => {
+      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived, deleted }, (err, xstat) => {
         if (err) return cb(err)
         xstat.name = path.basename(target)
         fs.rename(tmpDir, target, err => err ? cb(err) : cb(null, xstat))
@@ -175,6 +174,7 @@ const _createDir = ({ target, attrs }, callback) => {
         if (bmtime) orig.bmtime = bmtime
         if (bname) orig.bname = bname
         if (attrs.hasOwnProperty('archived')) orig.archived = attrs.archived
+        if (attrs,hasOwnProperty('deleted')) orig.deleted = attrs.deleted
         Object.assign(xa, orig)
         xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
           return err ? callback(err) : callback(null, xa)

@@ -3,9 +3,7 @@ const path = require('path')
 const fs = require('fs')
 
 const rimraf = require('rimraf')
-const rimrafAsync = Promise.promisify(require('rimraf'))
 const mkdirp = require('mkdirp')
-const mkdirpAsync = Promise.promisify(require('mkdirp'))
 const UUID = require('uuid')
 const request = require('supertest')
 const JWT = require('jwt-simple')
@@ -14,14 +12,6 @@ const chai = require('chai').use(require('chai-as-promised'))
 const sinon = require('sinon')
 const expect = chai.expect
 const should = chai.should()
-
-const {
-  IDS,
-  createUserAsync,
-  retrieveTokenAsync,
-  createPublicDriveAsync
-} = require('./lib')
-
 const App = require('src/app/App')
 const Fruitmix = require('src/fruitmix/Fruitmix')
 

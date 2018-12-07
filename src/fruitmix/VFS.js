@@ -275,6 +275,11 @@ class VFS extends EventEmitter {
   @param {object} props.dirUUID
   */
   READDIR(user, props, callback) {
+    // backup add
+    if (this.isBackupDrive(props.driveUUID))
+      return this.vfs.READDIR(user, props, callback)
+    // backup end
+
     this.dirGET(user, props, (err, combined) => {
       if (err) return callback(err)
       callback(null, combined.entries)
@@ -291,11 +296,6 @@ class VFS extends EventEmitter {
   */
   dirGET (user, props, callback) {
     let dir, root, drive
-
-    //backup add
-    if (this.isBackupDrive(props.driveUUID))
-      return this.backup.dirGET(user, props, callback)
-    //backup end
 
     // find dir
     dir = this.forest.uuidMap.get(props.dirUUID)

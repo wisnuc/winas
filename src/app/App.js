@@ -43,6 +43,10 @@ The combination is configurable.
 @module App
 */
 
+
+// for test mode
+if (!global.GLOBAL_CONFIG) global.GLOBAL_CONFIG = Config
+
 /**
 App is the top-level container for the application.
 */
