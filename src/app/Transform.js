@@ -4,7 +4,7 @@ const _ = require('lodash')
 const request = require('request')
 const path = require('path')
 const fs = require('fs')
-const debug = require('debug')('ws:transform')
+const debug = require('debug')('wss:transform')
 
 const routing = require('./routing')
 

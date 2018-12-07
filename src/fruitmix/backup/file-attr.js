@@ -95,7 +95,6 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   if (bmtime) attr.bmtime = bmtime
   if (bname) attr.bname
   if (desc) attr.desc = desc
-  console.log('xxxxxxxxxxxxxxx', props)
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
     let index = attrs.attrs.findIndex(x => x.uuid === fileUUID)
