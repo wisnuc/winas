@@ -174,7 +174,7 @@ const _createDir = ({ target, attrs }, callback) => {
         if (bmtime) orig.bmtime = bmtime
         if (bname) orig.bname = bname
         if (attrs.hasOwnProperty('archived')) orig.archived = attrs.archived
-        if (attrs,hasOwnProperty('deleted')) orig.deleted = attrs.deleted
+        if (attrs.hasOwnProperty('deleted')) orig.deleted = attrs.deleted
         Object.assign(xa, orig)
         xattr.set(target, 'user.fruitmix', JSON.stringify(xa), err => {
           return err ? callback(err) : callback(null, xa)
