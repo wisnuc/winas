@@ -78,6 +78,7 @@ class BACKUP {
     if (drive.type !== 'backup') return process.nextTick(() => callback(new Error('not backup dir')))
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
+      if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
       let args = { tmp: data, dirPath: dir.abspath(), hash: sha256, attrs: props }
       fileAttr.createFile(args, (err, data) => {
         if (err) return callback(err)

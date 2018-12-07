@@ -99,7 +99,9 @@ class Reading extends Directory.prototype.Reading {
       let xstat = map.get(child.uuid)
       if (xstat) {
         if (child instanceof File) {
-          if (child.name !== xstat.name || child.hash !== xstat.hash) {
+          if (child.name !== xstat.name || child.hash !== xstat.hash || 
+              child.bname !== xstat.bname || child.bctime !== xstat.bctime ||
+              child.bmtime !== xstat.bmtime || child.archived !== xstat.archived ) {
             // if name or hash changed re-create it, this makes it simple to update indexing
             child.destroy(true)
             new File(this.dir.ctx, this.dir, xstat)
@@ -109,6 +111,9 @@ class Reading extends Directory.prototype.Reading {
         } else if (child instanceof Directory) {
           if (child.name !== xstat.name) child.updateName(xstat.name)
           if (child.mtime !== xstat.mtime) child.read()
+          
+          // update propertys which backup added
+          child.updatePropertys(xstat)
         }
         map.delete(child.uuid)
       } else {
@@ -130,6 +135,15 @@ class BDirectory extends Directory {
   constructor(ctx, parent, xstat) {
     super(ctx, parent, xstat)
 
+    this.archived = xstat.archived
+    this.deleted = xstat.deleted
+    this.metadata = xstat.metadata
+    this.bctime = xstat.bctime
+    this.bmtime = xstat.bmtime
+    this.bname = xstat.bname
+  }
+
+  updatePropertys(xstat) {
     this.archived = xstat.archived
     this.deleted = xstat.deleted
     this.metadata = xstat.metadata

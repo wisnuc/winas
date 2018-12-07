@@ -3,6 +3,14 @@ const debug = require('debug')('wss:backup-file')
 const path = require('path')
 
 class BFile extends File {
+  
+  constructor (ctx, parent, xstat) {
+    super(ctx, parent, xstat)
+    this.archived = xstat.archived
+    this.bctime = xstat.bctime
+    this.bmtime = xstat.bmtime
+    this.bname = xstat.bname
+  }
   /**
     @rewrite 
   */
