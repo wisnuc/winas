@@ -3,6 +3,7 @@ const path = require('path')
 const UUID = require('uuid')
 
 const fileAttr = require('./file-attr')
+const { btrfsConcat } = require('../../lib/btrfs')
 
 const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' })
 
@@ -84,6 +85,86 @@ class BACKUP {
         if (err) return callback(err)
         return callback(null, Object.assign(data, { hash: sha256, name: props.name }))
       })
+    })
+  }
+
+  /**
+  APPEND data after an existing file
+  @param {object} user
+  @param {object} props
+  @param {object} props.name - file name
+  @param {object} props.hash - fingerprint of existing file (before appending)
+  @param {object} props.data - data file
+  @param {object} props.size - data size (not used?)
+  @param {object} props.sha256 -data sha256
+  @param {object} props.fingerprint - the final file fingerprint
+  */
+  append(user, props, callback) {
+    this.vfs.DIR(user, props, (err, dir) => {
+      if (err) return callback(err) 
+    
+      let { name, hash, data, size, sha256 } = props
+
+      let target = path.join(dir.abspath(), hash)
+      fs.lstat(target, (err, stat) => {
+        if (err) return callback(err)
+        if (!stat.isFile()) {
+          let err = new Error('not a file')
+          err.code = 'EISDIR'
+          err.status = 403
+          return callback(err)
+        }
+        
+        if (stat.size % (1024 * 1024 * 1024) !== 0) {
+          let err = new Error('not a multiple of 1G')
+          err.code = 'EALIGN' // kernel use EINVAL for non-alignment of sector size
+          err.status = 403
+          return callback(err)
+        }
+
+        let tmp = this.vfs.TMPFILE()
+
+      })
+      
+      // readXstat(target, (err, xstat) => {
+
+      //   // concat target and data to a tmp file
+      //   // TODO sync before op
+      //   btrfsConcat(tmp, [target, data], err => {
+      //     if (err) return callback(err)
+
+      //     fs.lstat(target, (err, stat) => {
+      //       if (err) return callback(err)
+      //       if (stat.mtime.getTime() !== xstat.mtime) {
+      //         let err = new Error('race detected')
+      //         err.code = 'ERACE'
+      //         err.status = 403
+      //         return callback(err)
+      //       }
+
+      //       const combineHash = (a, b) => {
+      //         let a1 = typeof a === 'string' ? Buffer.from(a, 'hex') : a
+      //         let b1 = typeof b === 'string' ? Buffer.from(b, 'hex') : b
+      //         let hash = crypto.createHash('sha256')
+      //         hash.update(Buffer.concat([a1, b1]))
+      //         let digest = hash.digest('hex')
+      //         return digest
+      //       }
+
+      //       // TODO preserve tags
+      //       forceXstat(tmp, { 
+      //         uuid: xstat.uuid, 
+      //         hash: xstat.size === 0 ? sha256 : combineHash(hash, sha256)
+      //       }, (err, xstat2) => {
+      //         if (err) return callback(err)
+
+      //         // TODO dirty
+      //         xstat2.name = name
+      //         fs.rename(tmp, target, err => err ? callback(err) : callback(null, xstat2))
+      //       })
+      //     })
+      //   })
+      // })
     })
   }
 
@@ -203,7 +284,6 @@ class BACKUP {
     })
   }
 
-  append() {}
 }
 
 module.exports = BACKUP

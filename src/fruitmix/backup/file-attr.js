@@ -190,6 +190,7 @@ const _createDir = ({ target, attrs }, callback) => {
 const _createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
   let { uuid, archived, bctime, bmtime, fingerprint, bname, desc } = attrs
   if (attrs.name && !bname) bname = attrs.name
+  if (hash === fingerprint) fingerprint = undefined // file upload complete
   if (typeof archived === 'boolean') archived = archived ? true : undefined
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
   let target = path.join(dirPath, hash)
