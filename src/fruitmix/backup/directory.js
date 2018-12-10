@@ -80,7 +80,7 @@ class Reading extends Directory.prototype.Reading {
     this.dir.fileSize = xstats.filter(x => x.type === 'file').reduce((acc, f) => acc + f.size, 0)
 
     // keep all file names
-    // skip append mid file
+    // skip append mind file
     this.dir.unindexedFiles = xstats
       .filter(x => x.type === 'file' && !x.metadata && !x.tags && !x.fingerprint )
       .map(x => x.bname || x.name)

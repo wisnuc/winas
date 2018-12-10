@@ -200,7 +200,7 @@ describe('backup newfile', async () => {
       process.stdout.write('...done\n')
     })
 
-    it.only('append return 200', async function() {
+    it('append return 200', async function() {
       this.timeout(0)
       let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
       expect(data.uuid).to.equal(data.name)
@@ -218,9 +218,29 @@ describe('backup newfile', async () => {
       let final = res.body.entries.find(x => !x.fingerprint)
       expect(final.hash).to.equal(FILES.fiveGiga.hash)
       expect(final).to.not.haveOwnProperty('fingerprint')
-      
       let dir = app.fruitmix.vfs.forest.uuidMap.get(world.uuid)
       expect(dir.unindexedFiles).to.be.deep.equal([ final.name ])
+    })
+
+    it.only('append return 200', async function() {
+      this.timeout(0)
+      let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
+      expect(data.uuid).to.equal(data.name)
+      let world = await createBPDirAsync(backup.uuid, data.uuid, 'world')
+      expect(world.name).to.equal('world')
+      await Promise.promisify(NewFile2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga, FILES.fiveGiga.hash, null, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.oneGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.twoGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.threeGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.fourGiga.hash, FILES.fiveGiga.hash, 200)
+      let res =  await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}`, 'get').expect(200)
+      let final = res.body.entries.find(x => !x.fingerprint)
+      await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}/entries`, 'post')
+        .field('five-giga', JSON.stringify({ op:'remove', hash: FILES.fiveGiga.hash, uuid: final.uuid }))
+        .expect(200)
+      res =  await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}`, 'get').expect(200)
+      expect(res.body.entries).to.be.an('array').and.lengthOf(1)
+      expect(res.body.entries[0].deleted).to.be.true
     })
   })  
 })

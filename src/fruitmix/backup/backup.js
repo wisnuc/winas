@@ -2,9 +2,11 @@ const fs = require('fs')
 const path = require('path')
 const UUID = require('uuid')
 const crypto = require('crypto')
+const Promise = require('bluebird')
 
 const fileAttr = require('./file-attr')
 const { btrfsConcat } = require('../../lib/btrfs')
+const readdirAsync = Promise.promisify(require('./readdir'))
 
 const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' })
 
@@ -23,10 +25,19 @@ class BACKUP {
       if (hash || fileUUID) {
         if (hash && fileUUID) { // file
           let args = { dirPath: dir.abspath(), hash, fileUUID }
-          return fileAttr.deleteFileAttr(args, (err, fattr) => {
+          let done = () => fileAttr.deleteFileAttr(args, (err, fattr) => {
             if (err) return callback(err)
             args = { dirPath: dir.abspath(), props: Object.assign(fattr, { hash }) }
             return fileAttr.createWhiteout(args, callback)
+          })
+          fs.lstat(path.join(dir.abspath(), hash), (err, stat) => {
+            if (err) return callback(err)
+            if (stat.size > 1024 * 1024 * 1024) {
+              this.deleteSameFpAsync(dir.abspath(), props.dirUUID, hash)
+                .then(x => (console.log(`backup ${hash} clean up`), done()))
+                .catch(e => (console.log(e), done()))
+            } else
+              done()
           })
         } else {
           return callback(new Error('delete file must fileUUID && hash'))
@@ -38,6 +49,23 @@ class BACKUP {
         return fileAttr.updateDirAttr(args, callback)
       }
     })
+  }
+
+  // delete unused intermediate append file
+  async deleteSameFpAsync(dirPath, dirUUID, fingerprint) {
+    let xstats = (await readdirAsync(dirPath, dirUUID, null)).living
+    let finalFiles = xstats.filter(x => x.hash === fingerprint)
+    if (!finalFiles.length || finalFiles.length === 1) {
+      let deleteFileAttrAsync = Promise.promisify(fileAttr.deleteFileAttr)
+      let midFiles = xstats.filter(x => x.fingerprint === fingerprint && x.hash !== fingerprint).map(x => [x.hash, x.uuid])
+      for (let i = 0; i < midFiles.length; i++) {
+        try{
+          let args = { dirPath, hash: midFiles[i][0], fileUUID:midFiles[i][1] }
+          await deleteFileAttrAsync(args)
+        } catch(e) {}
+      }
+    } else
+      return 
   }
 
   findArchivedParent (dir) {
