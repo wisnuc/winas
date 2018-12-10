@@ -88,7 +88,6 @@ describe('backup newfile', async () => {
     .expect(code)
     .end((err, res) => {
       if (err) return cb(err)
-      console.log(res.body)
       cb(null, res)
     })
   }
@@ -107,7 +106,6 @@ describe('backup newfile', async () => {
       .expect(code)
       .end((err, res) => {
         if (err) return cb(err)
-        console.log(res.body)
         cb(null, res)
       })
   }
@@ -202,14 +200,27 @@ describe('backup newfile', async () => {
       process.stdout.write('...done\n')
     })
 
-    it('newfile 1 with fingerprint', async function() {
+    it.only('append return 200', async function() {
       this.timeout(0)
       let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
       expect(data.uuid).to.equal(data.name)
       let world = await createBPDirAsync(backup.uuid, data.uuid, 'world')
       expect(world.name).to.equal('world')
-      await Promise.promisify(NewFile2)(backup.uuid, world.uuid, 'two-giga', FILES.oneGiga, FILES.twoGiga.hash, null, 200)
-      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'two-giga', FILES.oneGiga,  FILES.oneGiga.hash, FILES.twoGiga.hash, 200)
+      await Promise.promisify(NewFile2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga, FILES.fiveGiga.hash, null, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.oneGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.twoGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.threeGiga.hash, FILES.fiveGiga.hash, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'five-giga', FILES.oneGiga,  FILES.fourGiga.hash, FILES.fiveGiga.hash, 200)
+      let res =  await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}`, 'get').expect(200)
+      expect(res.body.entries).to.be.an('array').and.to.have.lengthOf(5)
+      let hashs = [FILES.oneGiga.hash, FILES.twoGiga.hash, FILES.threeGiga.hash, FILES.fourGiga.hash, FILES.fiveGiga.hash].sort()
+      expect(res.body.entries.map(x => x.hash).sort()).to.deep.equal(hashs)
+      let final = res.body.entries.find(x => !x.fingerprint)
+      expect(final.hash).to.equal(FILES.fiveGiga.hash)
+      expect(final).to.not.haveOwnProperty('fingerprint')
+      
+      let dir = app.fruitmix.vfs.forest.uuidMap.get(world.uuid)
+      expect(dir.unindexedFiles).to.be.deep.equal([ final.name ])
     })
   })  
 })

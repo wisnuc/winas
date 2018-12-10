@@ -1706,14 +1706,16 @@ If `overwrite` is provided:
     "policy": [null, null],
     "bctime": 152555555555,
     "bmtime": 158888888888,
-    "archived": true
+    "archived": true,
+    "desc": "hahahahhahhah"
 }
 ```
 
 + `op`必须，且为字符串`newfile`
 + `size`必须，类型为数值，取值范围：0 <= size <= 1G
 + `sha256`必须为sha256字符，
-+ `bctime`, `bmtime`, `archived` 目前只用于backup目录下文件
++ `bctime`, `bmtime`, `archived`, `desc` 目前只用于backup目录下文件
++ `desc`限制大小为140字以内
 size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 1024 * 1024），超过1G的文件应该用newfile和append组合操作完成。
 
 原来使用`overwrite`的逻辑，可以用`["replace", null]`实现。
@@ -1735,6 +1737,10 @@ size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 
     "hash": "目标文件append操作之前的hash (fingerprint)",
     "size": 1234,
     "sha256": "数据块的sha256",
+    "bctime": 1555555,
+    "bmtime": 1555555,
+    "desc": "hahahhaha",
+    "archived": true
 }
 ```
 
@@ -1748,27 +1754,14 @@ size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 
 + `size`为大于0小于等于1GB的整数，包含1GB，不包含0；
 + `sha256`必须是合法的SHA256字串；
 + 目标文件的hash必须和参数提供的hash一致；
-
-
-#### archive
-
-用于归档backup目录下某文件或文件夹
-
-用途： 当客户端发现用户删除本地文件/文件夹，就需要把nas对应文件/文件夹标注为archive, 下次restore不主动恢复
-
-```json
-{
-    "op": "archive",
-    "uuid": "xxxxxxxxxxx",
-    "hash": "xxxxxxxx"
-}
-```
-当操作盘为`backup`时， archive 文件必须带`uuid`和‵hash`
++ 如`newfile`所述的属性也只有`backup`盘生效
 
 ### updateAttr
 
 用于修改`backup`盘下的文件或文件夹属性
 如果为更新文件`uuid`, `hash`必须要传， `directory`不用传
++ `metadata` 只有topdir 可以更新此属性, 其他文件或文件夹忽略此更新
++ `desc`只对文件有效，文件夹忽略此属性
 
 ```json
 {
@@ -1777,7 +1770,8 @@ size可以为0，size为0时sha256被服务器忽略；size最大为1G（1024 * 
     "metadata":{},
     "bctime": 15115154,
     "bmtime": 15444444,
-    "archived": true
+    "archived": true,
+    "desc": "hahahahahahaha"
 }
 ```
 
@@ -1893,11 +1887,11 @@ This function will remove tags from this file
             content-disposition: form-data; name="partial"; filename="{"size":FILE_SIZE,"sha256":"SHA256_HASH_STRING"}"
 
             xxxxxx
-            --BOUNDARY--
-
-+ Response 200
-
-+ Request addTags (multipart/form-data, boundary=BOUNDARY)
+            --BOUNDARY-属性-
+属性
++ Response 200属性
+属性
++ Request addTags (mult属性ipart/form-data, boundary=BOUNDARY)
     + Body
             
             --BOUNDARY

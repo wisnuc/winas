@@ -114,7 +114,6 @@ class BACKUP {
       if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
       let { hash, data, sha256 } = props
       let target = path.join(dir.abspath(), hash)
-      console.log(target)
       fs.lstat(target, (err, stat) => {
         if (err) return callback(err)
         if (!stat.isFile()) {
@@ -132,12 +131,9 @@ class BACKUP {
         }
 
         let tmp = this.vfs.TMPFILE()
-        console.log('tmp', tmp)
         btrfsConcat(tmp, [target, data], err => {
           if (err) return callback(err)
-          console.log('tmp', tmp)
           fs.lstat(target, (err, stat2) => {
-            console.log('tmp', target, stat2.mtime.getTime(), stat.mtime.getTime())
             if (err) return callback(err)
             if (stat2.mtime.getTime() !== stat.mtime.getTime()) {
               let err = new Error('race detected')

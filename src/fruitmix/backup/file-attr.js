@@ -316,6 +316,7 @@ const createFileXstat = (target, stats, attr) => {
   } 
   if (attr.bctime) xstat.bctime = attr.bctime
   if (attr.bmtime) xstat.bmtime = attr.bmtime
+  if (attr.fingerprint) xstat.fingerprint = attr.fingerprint
 
   xstat.archived = attr.archived
   return xstat
