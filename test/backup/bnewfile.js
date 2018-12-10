@@ -4,6 +4,7 @@ const fs = require('fs')
 
 const rimraf = require('rimraf')
 const mkdirp = require('mkdirp')
+const mkdirpAsync = Promise.promisify(require('mkdirp'))
 const UUID = require('uuid')
 const xattr = require('fs-xattr')
 
@@ -13,7 +14,8 @@ const should = chai.should()
 
 const App = require('src/app/App')
 const Fruitmix = require('src/fruitmix/Fruitmix')
-const { IDS, FILES, createReq, createToken, createBPDirAsync } = require('./lib')
+const { IDS, FILES, createReq, createToken } = require('./lib')
+const createBigFileAsync = Promise.promisify(require('src/utils/createBigFile'))
 
 const cwd = process.cwd()
 const tmptest = path.join(cwd, 'tmptest')
@@ -44,7 +46,6 @@ const createApp = (users, drives, callback) => {
 
 const createAppAsync = Promise.promisify(createApp)
 
-
 let backup = Object.assign({}, IDS.backup)
 describe('backup newfile', async () => {
   let app, token, REQ
@@ -71,6 +72,44 @@ describe('backup newfile', async () => {
     expect(attr.bname).to.equal(dirname)
     expect(attr.uuid).to.be.deep.equal(data.uuid)  
     return data
+  }
+
+  const NewFile2 = (driveUUID, dirUUID, name, file, fingerprint, overwrite, code, cb) => {
+    REQ(`/drives/${driveUUID}/dirs/${dirUUID}/entries`, 'post')
+    .attach(name, file.path, JSON.stringify({
+      op: 'newfile',
+      size: file.size,
+      sha256: file.hash,
+      fingerprint,
+      bctime: 1555555,
+      bmtime: 22555,
+      overwrite: overwrite || undefined
+    }))
+    .expect(code)
+    .end((err, res) => {
+      if (err) return cb(err)
+      console.log(res.body)
+      cb(null, res)
+    })
+  }
+
+  const Append2 = (driveUUID, dirUUID, name, file, append, fingerprint, code, cb) => {
+    REQ(`/drives/${driveUUID}/dirs/${dirUUID}/entries`, 'post')
+      .attach(name, file.path, JSON.stringify({
+        op: 'append',
+        size: file.size,
+        sha256: file.hash,
+        fingerprint,
+        bctime: 1555555,
+        bmtime: 22555,
+        hash: append
+      }))
+      .expect(code)
+      .end((err, res) => {
+        if (err) return cb(err)
+        console.log(res.body)
+        cb(null, res)
+      })
   }
 
   it('make top dir with metadata return 200', async () => {
@@ -144,4 +183,33 @@ describe('backup newfile', async () => {
       .field(world.name, JSON.stringify({ op:'updateAttr', archived: true }))
       .expect(200)
   })
+
+  describe('test append', () => {
+
+    before(async function (){
+      this.timeout(0)
+      try {
+        rimraf.sync('test-files')
+        await fs.lstatAsync('test-files')
+      } catch (e) {
+        if (e.code !== 'ENOENT') throw e
+      }
+
+      await mkdirpAsync('test-files')
+
+      process.stdout.write('      creating big files')
+      await createBigFileAsync(path.join(process.cwd(), 'test-files', 'one-giga'), 1024 * 1024 * 1024, '')
+      process.stdout.write('...done\n')
+    })
+
+    it('newfile 1 with fingerprint', async function() {
+      this.timeout(0)
+      let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
+      expect(data.uuid).to.equal(data.name)
+      let world = await createBPDirAsync(backup.uuid, data.uuid, 'world')
+      expect(world.name).to.equal('world')
+      await Promise.promisify(NewFile2)(backup.uuid, world.uuid, 'two-giga', FILES.oneGiga, FILES.twoGiga.hash, null, 200)
+      await Promise.promisify(Append2)(backup.uuid, world.uuid, 'two-giga', FILES.oneGiga,  FILES.oneGiga.hash, FILES.twoGiga.hash, 200)
+    })
+  })  
 })

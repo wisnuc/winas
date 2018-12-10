@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const UUID = require('uuid')
+const crypto = require('crypto')
 
 const fileAttr = require('./file-attr')
 const { btrfsConcat } = require('../../lib/btrfs')
@@ -71,7 +72,13 @@ class BACKUP {
       fileAttr.createDir(args, callback)
     })
   }
-
+  /**
+   * 
+   * @param {object} user 
+   * @param {object} props 
+   *   - uuid, archived, bctime, bmtime, fingerprint, bname, desc, sha256
+   * @param {function} callback 
+   */
   newfile(user, props, callback){
     let { driveUUID, sha256, data } = props
     let drive = this.vfs.drives.find(d => d.uuid === driveUUID)
@@ -80,6 +87,7 @@ class BACKUP {
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
+      props.uuid = undefined  // clean uuid
       let args = { tmp: data, dirPath: dir.abspath(), hash: sha256, attrs: props }
       fileAttr.createFile(args, (err, data) => {
         if (err) return callback(err)
@@ -98,14 +106,15 @@ class BACKUP {
   @param {object} props.size - data size (not used?)
   @param {object} props.sha256 -data sha256
   @param {object} props.fingerprint - the final file fingerprint
+    -- uuid, archived, bctime, bmtime, fingerprint, bname, desc, sha256
   */
   append(user, props, callback) {
     this.vfs.DIR(user, props, (err, dir) => {
       if (err) return callback(err) 
-    
-      let { name, hash, data, size, sha256 } = props
-
+      if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
+      let { hash, data, sha256 } = props
       let target = path.join(dir.abspath(), hash)
+      console.log(target)
       fs.lstat(target, (err, stat) => {
         if (err) return callback(err)
         if (!stat.isFile()) {
@@ -123,48 +132,38 @@ class BACKUP {
         }
 
         let tmp = this.vfs.TMPFILE()
-
+        console.log('tmp', tmp)
+        btrfsConcat(tmp, [target, data], err => {
+          if (err) return callback(err)
+          console.log('tmp', tmp)
+          fs.lstat(target, (err, stat2) => {
+            console.log('tmp', target, stat2.mtime.getTime(), stat.mtime.getTime())
+            if (err) return callback(err)
+            if (stat2.mtime.getTime() !== stat.mtime.getTime()) {
+              let err = new Error('race detected')
+              err.code = 'ERACE'
+              err.status = 403
+              return callback(err)
+            }
+            const combineHash = (a, b) => {
+              let a1 = typeof a === 'string' ? Buffer.from(a, 'hex') : a
+              let b1 = typeof b === 'string' ? Buffer.from(b, 'hex') : b
+              let hash = crypto.createHash('sha256')
+              hash.update(Buffer.concat([a1, b1]))
+              let digest = hash.digest('hex')
+              return digest
+            }
+            sha256 = stat.size === 0 ? sha256 : combineHash(hash, sha256)
+            props.sha256 = sha256  // translate
+            props.uuid = undefined  // clean uuid
+            let args = { tmp, dirPath: dir.abspath(), hash: sha256, attrs: props }
+            fileAttr.createFile(args, (err, data) => {
+              if (err) return callback(err)
+              return callback(null, Object.assign(data, { hash: sha256, name: props.name }))
+            })
+          })
+        })
       })
-      
-      // readXstat(target, (err, xstat) => {
-
-      //   // concat target and data to a tmp file
-      //   // TODO sync before op
-      //   btrfsConcat(tmp, [target, data], err => {
-      //     if (err) return callback(err)
-
-      //     fs.lstat(target, (err, stat) => {
-      //       if (err) return callback(err)
-      //       if (stat.mtime.getTime() !== xstat.mtime) {
-      //         let err = new Error('race detected')
-      //         err.code = 'ERACE'
-      //         err.status = 403
-      //         return callback(err)
-      //       }
-
-      //       const combineHash = (a, b) => {
-      //         let a1 = typeof a === 'string' ? Buffer.from(a, 'hex') : a
-      //         let b1 = typeof b === 'string' ? Buffer.from(b, 'hex') : b
-      //         let hash = crypto.createHash('sha256')
-      //         hash.update(Buffer.concat([a1, b1]))
-      //         let digest = hash.digest('hex')
-      //         return digest
-      //       }
-
-      //       // TODO preserve tags
-      //       forceXstat(tmp, { 
-      //         uuid: xstat.uuid, 
-      //         hash: xstat.size === 0 ? sha256 : combineHash(hash, sha256)
-      //       }, (err, xstat2) => {
-      //         if (err) return callback(err)
-
-      //         // TODO dirty
-      //         xstat2.name = name
-      //         fs.rename(tmp, target, err => err ? callback(err) : callback(null, xstat2))
-      //       })
-      //     })
-      //   })
-      // })
     })
   }
 

@@ -178,11 +178,11 @@ class Heading extends State {
 
       if (!isNonNullObject(filename) || Array.isArray(filename)) throw new Error('invalid filename field')
       let { op, hash, size, sha256, policy } = filename
-      let { uptype, bname, bctime, bmtime, archived} = filename // backup add
+      let { bname, bctime, bmtime, archived, fingerprint} = filename // backup add
       if (op === 'newfile') {
-        Object.assign(this.ctx.args, { op, size, sha256, policy, uptype, bname, bctime, bmtime, archived })
+        Object.assign(this.ctx.args, { op, size, sha256, policy, bname, bctime, bmtime, archived, fingerprint })
       } else if (op = 'append') {
-        Object.assign(this.ctx.args, { op, hash, size, sha256, uptype, bname, bctime, bmtime, archived })
+        Object.assign(this.ctx.args, { op, hash, size, sha256, bname, bctime, bmtime, archived, fingerprint })
       } else {
         Object.assign(this.ctx.args, { op, hash, size, sha256, policy })
       }
@@ -256,7 +256,7 @@ class Parsing extends State {
       }
 
       let { op, policy, tags, uuid } = body
-      let { uptype, bname, bmtime, bctime, hash, archived, deleted, metadata } = body // backup added
+      let { bname, bmtime, bctime, hash, archived, deleted, metadata } = body // backup added
 
       try {
         if (op === 'mkdir' || op === 'rename' || op === 'dup') {
@@ -269,7 +269,7 @@ class Parsing extends State {
           }
 
           if (op === 'mkdir') { // backup added
-            Object.assign(this.ctx.args, { uptype, metadata, bname, bmtime, bctime, archived, uuid })
+            Object.assign(this.ctx.args, { metadata, bname, bmtime, bctime, archived, uuid })
             if (uuid && !isUUID(uuid)) throw new Error('invalid uuid')
           } 
         } else if (op === 'remove') {
@@ -405,7 +405,9 @@ class Executing extends State {
             policy: args.policy,
             bname: args.bname,
             bctime: args.bctime,
-            bmtime: args.bmtime
+            bmtime: args.bmtime,
+            archived: args.archived,
+            fingerprint: args.fingerprint
           }, (err, xstat, resolved) => {
             if (err) {
               this.setState(Failed, err)
@@ -425,7 +427,9 @@ class Executing extends State {
             sha256: args.sha256,
             bname: args.bname,
             bctime: args.bctime,
-            bmtime: args.bmtime
+            bmtime: args.bmtime,
+            archived: args.archived,
+            fingerprint: args.fingerprint
           }, (err, xstat) => {
             if (err) {
               this.setState(Failed, err)
