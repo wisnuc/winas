@@ -13,7 +13,43 @@ const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' }
 class BACKUP {
   constructor(vfs) {
     this.vfs = vfs
+    this.lock = new Map()
   }
+
+  call(op, args, callback) {
+    let { target, dirPath, hash } = args
+    let lockKey
+    if (target) {
+      lockKey = target
+    } else if (dirPath && hash) {
+      lockKey = path.join(dirPath, hash)
+    } else if (dirPath) { // for create whiteout
+      lockKey = path.join(dirPath, '.whiteout.')
+    } else {
+      return callback('invaild op')
+    }
+    let cb = (...args) => {
+      let ops = this.lock.get(lockKey)
+      ops.shift() // clean self
+      if (ops.length) this.schedule(lockKey)
+      else this.lock.delete(lockKey)
+      process.nextTick(() => callback(...args))
+    }
+    if (this.lock.has(lockKey)) {
+      this.lock.get(lockKey).push({ op, args, cb })
+    } else {
+      this.lock.set(lockKey, [{ op, args, cb }])
+      this.schedule(lockKey)
+    }
+  }
+
+  schedule(key) {
+    let ops = this.lock.get(key)
+    if (!ops || !ops.length) throw new Error('lock error')
+    let { op, args, cb } = op[0]
+    fileAttr[op](args, cb)
+  }
+  
 
   delete(user, props, callback) {
     let { hash, fileUUID, name, driveUUID } = props

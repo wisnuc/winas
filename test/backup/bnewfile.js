@@ -207,7 +207,7 @@ describe('backup newfile', async () => {
     })
   })
 
-  describe('test append', () => {
+  describe.skip('test append', () => {
 
     beforeEach(async function (){
       this.timeout(0)

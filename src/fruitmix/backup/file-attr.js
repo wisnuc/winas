@@ -427,10 +427,6 @@ const write = (data, target, hardLink, mtime, callback) => {
 
 module.exports = {
   write,
-  createDir: (args, callback) => createAsync(_createDir, args).then(x => callback(null, x), callback),
-  createFile: (args, callback) => createAsync(_createFile, args).then(x => callback(null, x), callback),
-  createFileAttr: (args, callback) => createAsync(_createFileAttr, args).then(x => callback(null, x), callback),
-  createWhiteout: (args, callback) => createAsync(_createWhiteout, args).then(x => callback(null, x), callback),
   createFileXstat,
   createFileXstats,
   readFileAttr,
@@ -440,5 +436,9 @@ module.exports = {
   readWhiteout,
   deleteFileAttr: (args, callback) => createAsync(_deleteFileAttr, args).then(x => callback(null, x), callback),
   updateDirAttr: (args, callback) => createAsync(_updateDirAttr, args).then(x => callback(null, x), callback),
-  updateFileAttr: (args, callback) => createAsync(_updateFileAttr, args).then(x => callback(null, x), callback)
+  updateFileAttr: (args, callback) => createAsync(_updateFileAttr, args).then(x => callback(null, x), callback),
+  createDir: (args, callback) => createAsync(_createDir, args).then(x => callback(null, x), callback),
+  createFile: (args, callback) => createAsync(_createFile, args).then(x => callback(null, x), callback),
+  createFileAttr: (args, callback) => createAsync(_createFileAttr, args).then(x => callback(null, x), callback),
+  createWhiteout: (args, callback) => createAsync(_createWhiteout, args).then(x => callback(null, x), callback)
 }

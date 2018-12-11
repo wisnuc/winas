@@ -349,18 +349,17 @@ class Drive extends EventEmitter {
   }
 
   PATCH (user, props, callback) {
-    if (props.op && props.op === 'backup') {
-      return this.updateBackupDrive(user, props, callback)
-    }
     let driveUUID = props.driveUUID
-    delete props.driveUUID
     try {
       let drive = this.drives.find(drv => drv.uuid === driveUUID)
       if (!drive || drive.isDeleted) {
         throw Object.assign(new Error(`drive ${driveUUID} not found`), { status: 404 })
       }
+      if (drives.type === 'backup') {
+        return this.updateBackupDrive(user, props, callback)
+      }
+      delete props.driveUUID
       let recognized
-      
       if (drive.privacy === true || (drive.privacy === false && drive.tag === 'built-in')) recognized = ['label', 'smb']
       else recognized = ['writelist', 'label', 'smb'] // 'readlist',
 
@@ -407,13 +406,11 @@ class Drive extends EventEmitter {
   }
 
   DELETE (user, props, callback) {
-    if (props.op && props.op === 'backup') {
-      return this.deleteBackupDrive(user, props, callback)
-    }
-    if (!user || !user.isFirstUser) return callback(Object.assign(new Error('Permission Denied'), { status: 403 }))
     let driveUUID = props.driveUUID
-    if (Object.getOwnPropertyNames(props).length !== 1) return callback(Object.assign(new Error('invalid parameters'), { status: 400 }))
     let drive = this.drives.find(drv => drv.uuid === driveUUID)
+    if (drive && drive.type === 'backup') return this.deleteBackupDrive(user, props, callback)
+    if (!user || !user.isFirstUser) return callback(Object.assign(new Error('Permission Denied'), { status: 403 }))
+    if (Object.getOwnPropertyNames(props).length !== 1) return callback(Object.assign(new Error('invalid parameters'), { status: 400 }))
     if (!drive || drive.privacy !== false || drive.isDeleted) return callback(Object.assign(new Error('invalid driveUUID'), { status: 400 }))
     if (drive.tag === 'built-in') return callback(Object.assign(new Error('built-in drive can not be deleted'), { status: 400 }))
     this.deleteDrive(driveUUID, props, callback)
