@@ -66,7 +66,7 @@ const FILES = {
   bar: {
     name: '1.pdf',
     path: 'testdata/1.pdf',
-    size: 4,
+    size: 1452618,
     hash: '1fd31e1f26f3a68a354c236b36f7799627e1b27546fe8f3b409cbcacc7c55f39' 
   },
 

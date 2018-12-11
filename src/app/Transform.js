@@ -86,7 +86,7 @@ class Pipe extends EventEmitter {
   }
   /**
    * check authorization
-   * @param {string} phicommUserId
+   * @param {string} winasUserId
    * @return {object} user
    */
   checkUser (winasUserId) {

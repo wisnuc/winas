@@ -51,9 +51,8 @@ class Drive extends EventEmitter {
     if (!deletedUsers.length) return
     this.store.save(drives => {
       let tmpDrives = JSON.parse(JSON.stringify(drives))
-      
       tmpDrives.forEach(tD => {
-        if (tD.privacy === true && deletedUsers.includes(tD.owner)) {
+        if ((tD.privacy === true || tD.type === 'backup') && deletedUsers.includes(tD.owner)) {
           tD.isDeleted = true
         }
         else if (tD.privacy === false　&& tD.tag !== 'built-in') {

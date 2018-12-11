@@ -37,7 +37,7 @@ const createAsync = async (fn, args) => {
     lockset.delete(lockKey)
   }
 }
-// fix
+
 const _updateDirAttr = ({ target, props }, callback) => {
   let { bctime, bmtime, metadata, bname, archived, deleted, forceDelete } = props || {}
   let attr = {}
@@ -50,7 +50,7 @@ const _updateDirAttr = ({ target, props }, callback) => {
   if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
   if (typeof deleted === 'boolean') attr.deleted = deleted ? true : undefined
-  xattr.get(target, 'user.fruitmix', (err, xa) => { // FIXME: ERACE
+  xattr.get(target, 'user.fruitmix', (err, xa) => {
     if (err) return callback(err)
     try {
       xa = JSON.parse(xa)
@@ -77,7 +77,7 @@ const _updateDirAttr = ({ target, props }, callback) => {
     }
   })
 }
-// fix
+
 const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   let { bctime, bmtime, bname, archived, desc } = props || {}
   let attr = {}
@@ -122,7 +122,7 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   })
 }
 
-// fix
+
 const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
@@ -141,7 +141,7 @@ const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
       return write(attrs, targetPath, false, null, err => err ? callback(err) : callback(null, attr))
   })
 }
-// fix
+
 // bname can not update
 const _createDir = ({ target, attrs }, callback) => {
   let { uuid, metadata, bctime, bmtime, bname, deleted } = attrs
@@ -207,7 +207,7 @@ const _createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
     }
   })
 }
-// fix
+
 const _createFileAttr = ({ dirPath, hash, props }, callback) => {
 
   let { uuid, archived, bname, bctime, bmtime, fingerprint, desc } = props || {}
@@ -266,7 +266,7 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
     }
   })
 }
-// fix
+
 const _createWhiteout = ({ dirPath, props }, callback) => {
   let targetPath = path.join(dirPath, '.whiteout.' + WO_UUID)
   props.otime = new Date().getTime() // operation time
