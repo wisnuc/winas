@@ -10,6 +10,7 @@ class BFile extends File {
     this.bctime = xstat.bctime
     this.bmtime = xstat.bmtime
     this.bname = xstat.bname
+    this.otime = xstat.otime
   }
   /**
     @rewrite 

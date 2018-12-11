@@ -37,13 +37,14 @@ const createAsync = async (fn, args) => {
     lockset.delete(lockKey)
   }
 }
-
+// fix
 const _updateDirAttr = ({ target, props }, callback) => {
   let { bctime, bmtime, metadata, bname, archived, deleted, forceDelete } = props || {}
   let attr = {}
   if (bctime) attr.bctime = bctime
   if (bmtime) attr.bmtime = bmtime
   if (metadata) attr.metadata = metadata
+  attr.otime = new Date().getTime()
   // skip bname property update
   // if (bname) attr.bname 
   if (typeof archived === 'boolean') attr.archived = archived ? true : undefined
@@ -76,7 +77,7 @@ const _updateDirAttr = ({ target, props }, callback) => {
     }
   })
 }
-
+// fix
 const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   let { bctime, bmtime, bname, archived, desc } = props || {}
   let attr = {}
@@ -95,6 +96,7 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   if (bmtime) attr.bmtime = bmtime
   if (bname) attr.bname
   if (desc) attr.desc = desc
+  attr.otime = new Date().getTime()
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
     let index = attrs.attrs.findIndex(x => x.uuid === fileUUID)
@@ -120,7 +122,7 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   })
 }
 
-
+// fix
 const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
@@ -139,7 +141,7 @@ const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
       return write(attrs, targetPath, false, null, err => err ? callback(err) : callback(null, attr))
   })
 }
-
+// fix
 // bname can not update
 const _createDir = ({ target, attrs }, callback) => {
   let { uuid, metadata, bctime, bmtime, bname, deleted } = attrs
@@ -150,7 +152,7 @@ const _createDir = ({ target, attrs }, callback) => {
     let tmpDir = path.join(global.TMPDIR(), UUID.v4())
     fs.mkdir(tmpDir, err => {
       if (err) return cb(err)
-      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived, deleted }, (err, xstat) => {
+      forceXstat(tmpDir, { uuid, metadata, bctime, bmtime, bname, archived, deleted, otime: new Date().getTime() }, (err, xstat) => {
         if (err) return cb(err)
         xstat.name = path.basename(target)
         fs.rename(tmpDir, target, err => err ? cb(err) : cb(null, xstat))
@@ -168,6 +170,7 @@ const _createDir = ({ target, attrs }, callback) => {
           return callback(Object.assign(e, { xcode: 'EXATTR' }))
         }
         let orig = {}
+        orig.otime = new Date().getTime()
         if (metadata) orig.metadata = metadata
         if (bctime) orig.bctime = bctime
         if (bmtime) orig.bmtime = bmtime
@@ -204,7 +207,7 @@ const _createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
     }
   })
 }
-
+// fix
 const _createFileAttr = ({ dirPath, hash, props }, callback) => {
 
   let { uuid, archived, bname, bctime, bmtime, fingerprint, desc } = props || {}
@@ -233,9 +236,11 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
     return process.nextTick(() => callback(EINVAL('invalid bmtime')))
   if (desc && (!isNonEmptyString(desc) || desc.length > 140))
     return process.nextTick(() => callback(EINVAL('invalid desc')))
+  
+  let orig = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
+  orig.otime = new Date().getTime() // operation time
   fs.lstat(targetPath, (err, stat) => {
     if (err && err.code === 'ENOENT') {
-      let orig = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
       let attrs = { attrs: [orig] }
       write(attrs, targetPath, true, null, err => { // use hard link to skip rename race
         if (err && err.code === 'EEXIST') {
@@ -251,10 +256,9 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
       let mtime = stat.mtime.getTime()
       readFileAttrs(dirPath, hash, (err, data) => {
         if (err) return callback(err)
-        let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
         if (Array.isArray(data.attrs)) {
-          data.attrs.push(attr)
-          write(data, targetPath, false, mtime, err => err ? callback(err) : callback(null, attr))
+          data.attrs.push(orig)
+          write(data, targetPath, false, mtime, err => err ? callback(err) : callback(null, orig))
         } else {
           throw new Error('File Attr Not Array')
         }
@@ -262,9 +266,10 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
     }
   })
 }
-
+// fix
 const _createWhiteout = ({ dirPath, props }, callback) => {
   let targetPath = path.join(dirPath, '.whiteout.' + WO_UUID)
+  props.otime = new Date().getTime() // operation time
   fs.lstat(targetPath, (err, stat) => {
     if (err && err.code === 'ENOENT') {
       let attrs = [props]
@@ -310,18 +315,17 @@ const createFileXstat = (target, stats, attr) => {
     xstat.metadata = metadata
   }
   if (attr.desc) xstat.desc = desc
-  if (attr.bname) {// replace name
-    xstat.name = attr.bname
+  if (attr.bname) {
+    xstat.name = attr.bname // replace name
     xstat.bname = attr.bname
   } 
   if (attr.bctime) xstat.bctime = attr.bctime
   if (attr.bmtime) xstat.bmtime = attr.bmtime
   if (attr.fingerprint) xstat.fingerprint = attr.fingerprint
-
+  xstat.otime = attr.otime // operation time
   xstat.archived = attr.archived
   return xstat
 }
-
 
 const createFileXstats = (target, stats, attrs, metadata) => {
   let xstats = []

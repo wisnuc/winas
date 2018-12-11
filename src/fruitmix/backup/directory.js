@@ -142,6 +142,7 @@ class BDirectory extends Directory {
     this.bctime = xstat.bctime
     this.bmtime = xstat.bmtime
     this.bname = xstat.bname
+    this.otime = xstat.otime
   }
 
   updatePropertys(xstat) {
@@ -151,6 +152,7 @@ class BDirectory extends Directory {
     this.bctime = xstat.bctime
     this.bmtime = xstat.bmtime
     this.bname = xstat.bname
+    this.otime = xstat.otime
   }
   
 }

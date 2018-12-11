@@ -138,6 +138,7 @@ const readXattr = (target, stats, callback) => {
       attr.bname = orig.bname
       attr.bctime = orig.bctime
       attr.bmtime = orig.bmtime
+      attr.otime = orig.otime
       if (orig.hasOwnProperty('archived') || orig.hasOwnProperty('deleted')) {
         if (orig.hasOwnProperty('archived') && orig.archived === true) {
           attr.archived = true
@@ -147,7 +148,7 @@ const readXattr = (target, stats, callback) => {
           attr.deleted = true
         }
       }
-      
+      // backup end
       // if (Object.keys(orig).length !== 1) attr.dirty = undefined
     } else {
       if (orig.hasOwnProperty('hash') || orig.hasOwnProperty('time')) {
@@ -282,7 +283,8 @@ const createXstat = (target, stats, attr) => {
     if (attr.bmtime) xstat.bmtime = attr.bmtime
     xstat.archived = attr.archived
     xstat.deleted = attr.deleted
-    //
+    xstat.otime = attr.otime
+    // backup end
   } else {
     xstat = {
       uuid: attr.uuid,
@@ -378,7 +380,7 @@ This function is supposed to be used only for temporary file
 @param {number[]} [props.tags] - preserve tags, accept empty array
 */
 const forceXstat = (target, props, callback) => {
-  let { uuid, hash, tags, archived, deleted, bname, bctime, bmtime, metadata } = props || {}
+  let { uuid, hash, tags, archived, deleted, bname, bctime, bmtime, metadata, otime } = props || {}
 
   if (uuid && !isUUID(uuid)) {
     let err = new Error('invalid uuid')
@@ -428,6 +430,7 @@ const forceXstat = (target, props, callback) => {
       attr.bmtime = bmtime
       attr.archived = archived
       attr.deleted = deleted
+      attr.otime = otime || new Date().getTime()
     }
 
     updateXattr(target, attr, stat.isFile(), (err, attr) => {
