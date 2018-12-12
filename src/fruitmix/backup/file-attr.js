@@ -36,7 +36,6 @@ const call = (command, args, callback) => {
     if (ops.length) schedule(lockKey)
     else {
       lock.delete(lockKey)
-      console.log('schedule success')
     }
     process.nextTick(() => callback(...args))
   }
@@ -49,7 +48,6 @@ const call = (command, args, callback) => {
 }
 
 const schedule = (key) => {
-  console.log('come schedule')
   let ops = lock.get(key)
   if (!ops || !ops.length) throw new Error('lock error')
   let { command, args, cb } = ops[0]
