@@ -14,9 +14,11 @@ const fileMeta = require('../../lib/file-meta')
 const WO_UUID = '13d20466-9893-4835-a436-1d4b3a0e26f7'
 const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' })
 
-const lockset = new Set()
+const lock = new Map()
 
-const createAsync = async (fn, args) => {
+const FUNCS = {}
+
+const call = (command, args, callback) => {
   let { target, dirPath, hash } = args
   let lockKey
   if (target) {
@@ -26,19 +28,35 @@ const createAsync = async (fn, args) => {
   } else if (dirPath) { // for create whiteout
     lockKey = path.join(dirPath, '.whiteout.')
   } else {
-    throw new Error('invaild op')
+    return callback('invaild key for call')
   }
-
-  while (lockset.has(lockKey)) await Promise.delay(0)
-  lockset.add(lockKey)
-  try {
-    return await Promise.promisify(fn)(args)
-  } finally{
-    lockset.delete(lockKey)
+  let cb = (...args) => {
+    let ops = lock.get(lockKey)
+    ops.shift() // clean self
+    if (ops.length) schedule(lockKey)
+    else {
+      lock.delete(lockKey)
+      console.log('schedule success')
+    }
+    process.nextTick(() => callback(...args))
+  }
+  if (lock.has(lockKey)) {
+    lock.get(lockKey).push({ command, args, cb })
+  } else {
+    lock.set(lockKey, [{ command, args, cb }])
+    schedule(lockKey)
   }
 }
 
-const _updateDirAttr = ({ target, props }, callback) => {
+const schedule = (key) => {
+  console.log('come schedule')
+  let ops = lock.get(key)
+  if (!ops || !ops.length) throw new Error('lock error')
+  let { command, args, cb } = ops[0]
+  FUNCS[command](args, cb)
+}
+
+const updateDirAttr = ({ target, props }, callback) => {
   let { bctime, bmtime, metadata, bname, archived, deleted, forceDelete } = props || {}
   let attr = {}
   if (bctime) attr.bctime = bctime
@@ -78,7 +96,9 @@ const _updateDirAttr = ({ target, props }, callback) => {
   })
 }
 
-const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
+FUNCS.updateDirAttr = updateDirAttr
+
+const updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   let { bctime, bmtime, bname, archived, desc } = props || {}
   let attr = {}
   if (bname && !isNonEmptyString(bname)) 
@@ -122,8 +142,9 @@ const _updateFileAttr = ({ dirPath, hash, fileUUID, props }, callback) => {
   })
 }
 
+FUNCS.updateFileAttr = updateFileAttr
 
-const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
+const deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
   readFileAttrs(dirPath, hash, (err, attrs) => {
     if (err) return callback(err)
     let index = attrs.attrs.findIndex(x => x.uuid === fileUUID)
@@ -142,8 +163,10 @@ const _deleteFileAttr = ({ dirPath, hash, fileUUID }, callback) => {
   })
 }
 
+FUNCS.deleteFileAttr = deleteFileAttr
+
 // bname can not update
-const _createDir = ({ target, attrs }, callback) => {
+const createDir = ({ target, attrs }, callback) => {
   let { uuid, metadata, bctime, bmtime, bname, deleted } = attrs
   if (typeof attrs.archived === 'boolean') attrs.archived = archived ? true : undefined // convert archived
   else if (attrs.archived) return callback(new Error('archived must typeof boolean or undefined'))
@@ -190,7 +213,9 @@ const _createDir = ({ target, attrs }, callback) => {
   })
 }
 
-const _createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
+FUNCS.createDir = createDir
+
+const createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
   let { uuid, archived, bctime, bmtime, fingerprint, bname, desc } = attrs
   if (attrs.name && !bname) bname = attrs.name
   if (hash === fingerprint) fingerprint = undefined // file upload complete
@@ -201,14 +226,16 @@ const _createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
     if (!err || (err && err.code === 'EEXIST')) {
       // ignore EEXIST error
       let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
-      _createFileAttr({ dirPath, hash, props: attr }, callback)
+      createFileAttr({ dirPath, hash, props: attr }, callback)
     } else {
       callback(err)
     }
   })
 }
 
-const _createFileAttr = ({ dirPath, hash, props }, callback) => {
+FUNCS.createFile = createFile
+
+const createFileAttr = ({ dirPath, hash, props }, callback) => {
 
   let { uuid, archived, bname, bctime, bmtime, fingerprint, desc } = props || {}
 
@@ -244,7 +271,7 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
       let attrs = { attrs: [orig] }
       write(attrs, targetPath, true, null, err => { // use hard link to skip rename race
         if (err && err.code === 'EEXIST') {
-          _createFileAttr({ dirPath, hash, props }, callback) // race, retry
+          createFileAttr({ dirPath, hash, props }, callback) // race, retry
         } else if (err) {
           callback(err)
         } else
@@ -267,7 +294,9 @@ const _createFileAttr = ({ dirPath, hash, props }, callback) => {
   })
 }
 
-const _createWhiteout = ({ dirPath, props }, callback) => {
+FUNCS.createFileAttr = createFileAttr
+
+const createWhiteout = ({ dirPath, props }, callback) => {
   let targetPath = path.join(dirPath, '.whiteout.' + WO_UUID)
   props.otime = new Date().getTime() // operation time
   fs.lstat(targetPath, (err, stat) => {
@@ -275,7 +304,7 @@ const _createWhiteout = ({ dirPath, props }, callback) => {
       let attrs = [props]
       write(attrs, targetPath, true, null, err => {
         if (err && err.code === 'EEXIST') {
-          _createWhiteout({ dirPath, props }, callback) // race, retry
+          createWhiteout({ dirPath, props }, callback) // race, retry
         } else if (err) {
           callback(err)
         } else
@@ -297,6 +326,22 @@ const _createWhiteout = ({ dirPath, props }, callback) => {
     }
   })
 }
+
+FUNCS.createWhiteout = createWhiteout
+
+const updateFileMeta = ({ dirPath, hash, attrs }, callback) => {
+  fileMeta(path.join(dirPath, hash), (err, metadata) => {
+    if (err) {
+      callback(err)
+    } else {
+      attrs.metadata = metadata
+      let targetPath = path.join(dirPath,'.xattr.' + hash)
+      write(attrs, targetPath, false, null, err => err ? callback(err) : callback(null, attrs))
+    }
+  })
+}
+
+FUNCS.updateFileMeta = updateFileMeta
 
 const createFileXstat = (target, stats, attr) => {
   let name = path.basename(target)
@@ -334,20 +379,6 @@ const createFileXstats = (target, stats, attrs, metadata) => {
     xstats.push(createFileXstat(target, stats, a))})
   return xstats
 }
-
-const _updateFileMeta = ({ dirPath, hash, attrs }, callback) => {
-  fileMeta(path.join(dirPath, hash), (err, metadata) => {
-    if (err) {
-      callback(err)
-    } else {
-      attrs.metadata = metadata
-      let targetPath = path.join(dirPath,'.xattr.' + hash)
-      write(attrs, targetPath, false, null, err => err ? callback(err) : callback(null, attrs))
-    }
-  })
-}
-
-const updateFileMeta = (args, callback) => createAsync(_updateFileMeta, args).then(x => callback(null, x), callback)
 
 /**
  * @param {*} dirPath 
@@ -388,7 +419,7 @@ const readFileXstats = (dirPath, hash, callback) => {
     readFileAttrs(dirPath, hash, (err, attrs) => {
       if (err) return callback(err)
       if (!attrs.hasOwnProperty('metadata')) {
-        updateFileMeta({ dirPath, hash, attrs }, (err, data) => {
+        call('updateFileMeta', { dirPath, hash, attrs }, (err, data) => {
           if (err) return callback(err)
           callback(null, createFileXstats(path.join(dirPath, hash), stats, data.attrs, data.metadata))
         })
@@ -434,11 +465,15 @@ module.exports = {
   readFileXstat,
   readFileXstats,
   readWhiteout,
-  deleteFileAttr: (args, callback) => createAsync(_deleteFileAttr, args).then(x => callback(null, x), callback),
-  updateDirAttr: (args, callback) => createAsync(_updateDirAttr, args).then(x => callback(null, x), callback),
-  updateFileAttr: (args, callback) => createAsync(_updateFileAttr, args).then(x => callback(null, x), callback),
-  createDir: (args, callback) => createAsync(_createDir, args).then(x => callback(null, x), callback),
-  createFile: (args, callback) => createAsync(_createFile, args).then(x => callback(null, x), callback),
-  createFileAttr: (args, callback) => createAsync(_createFileAttr, args).then(x => callback(null, x), callback),
-  createWhiteout: (args, callback) => createAsync(_createWhiteout, args).then(x => callback(null, x), callback)
+  call
+}
+
+module.exports.COMMAND = {
+  deleteFileAttr: 'deleteFileAttr',
+  updateDirAttr: 'updateDirAttr',
+  updateFileAttr: 'updateFileAttr',
+  createDir: 'createDir',
+  createFile: 'createFile',
+  createFileAttr: 'createFileAttr',
+  createWhiteout: 'createWhiteout'
 }

@@ -13,43 +13,7 @@ const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' }
 class BACKUP {
   constructor(vfs) {
     this.vfs = vfs
-    this.lock = new Map()
   }
-
-  call(op, args, callback) {
-    let { target, dirPath, hash } = args
-    let lockKey
-    if (target) {
-      lockKey = target
-    } else if (dirPath && hash) {
-      lockKey = path.join(dirPath, hash)
-    } else if (dirPath) { // for create whiteout
-      lockKey = path.join(dirPath, '.whiteout.')
-    } else {
-      return callback('invaild op')
-    }
-    let cb = (...args) => {
-      let ops = this.lock.get(lockKey)
-      ops.shift() // clean self
-      if (ops.length) this.schedule(lockKey)
-      else this.lock.delete(lockKey)
-      process.nextTick(() => callback(...args))
-    }
-    if (this.lock.has(lockKey)) {
-      this.lock.get(lockKey).push({ op, args, cb })
-    } else {
-      this.lock.set(lockKey, [{ op, args, cb }])
-      this.schedule(lockKey)
-    }
-  }
-
-  schedule(key) {
-    let ops = this.lock.get(key)
-    if (!ops || !ops.length) throw new Error('lock error')
-    let { op, args, cb } = op[0]
-    fileAttr[op](args, cb)
-  }
-  
 
   delete(user, props, callback) {
     let { hash, fileUUID, name, driveUUID } = props
@@ -61,10 +25,10 @@ class BACKUP {
       if (hash || fileUUID) {
         if (hash && fileUUID) { // file
           let args = { dirPath: dir.abspath(), hash, fileUUID }
-          let done = () => fileAttr.deleteFileAttr(args, (err, fattr) => {
+          let done = () => fileAttr.call(fileAttr.COMMAND.deleteFileAttr, args, (err, fattr) => {
             if (err) return callback(err)
             args = { dirPath: dir.abspath(), props: Object.assign(fattr, { hash }) }
-            return fileAttr.createWhiteout(args, callback)
+            return fileAttr.call(fileAttr.COMMAND.createWhiteout, args, callback)
           })
           fs.lstat(path.join(dir.abspath(), hash), (err, stat) => {
             if (err) return callback(err)
@@ -82,7 +46,7 @@ class BACKUP {
         // if top dir, force delete without deleted stub
         let forceDelete = dir.root().uuid === dir.uuid
         let args = { target: path.join(dir.abspath(), name), props: { deleted: true, forceDelete } }
-        return fileAttr.updateDirAttr(args, callback)
+        return fileAttr.call(fileAttr.COMMAND.updateDirAttr, args, callback)
       }
     })
   }
@@ -92,12 +56,12 @@ class BACKUP {
     let xstats = (await readdirAsync(dirPath, dirUUID, null)).living
     let finalFiles = xstats.filter(x => x.hash === fingerprint)
     if (!finalFiles.length || finalFiles.length === 1) {
-      let deleteFileAttrAsync = Promise.promisify(fileAttr.deleteFileAttr)
+      let callAsync = Promise.promisify(fileAttr.call)
       let midFiles = xstats.filter(x => x.fingerprint === fingerprint && x.hash !== fingerprint).map(x => [x.hash, x.uuid])
       for (let i = 0; i < midFiles.length; i++) {
         try{
           let args = { dirPath, hash: midFiles[i][0], fileUUID:midFiles[i][1] }
-          await deleteFileAttrAsync(args)
+          await callAsync(fileAttr.COMMAND.deleteFileAttr, args)
         } catch(e) {}
       }
     } else
@@ -133,7 +97,7 @@ class BACKUP {
       }
       let target = path.join(dir.abspath(), dirname)
       let args = { target, attrs: { metadata, uuid, bctime, bmtime, bname:name, archived, deleted: undefined } }
-      fileAttr.createDir(args, callback)
+      fileAttr.call(fileAttr.COMMAND.createDir, args, callback)
     })
   }
   /**
@@ -153,7 +117,7 @@ class BACKUP {
       if (dir.deleted) return callback(Object.assign(new Error('invaild op for deleted dir'), { status:400 }))
       props.uuid = undefined  // clean uuid
       let args = { tmp: data, dirPath: dir.abspath(), hash: sha256, attrs: props }
-      fileAttr.createFile(args, (err, data) => {
+      fileAttr.call(fileAttr.COMMAND.createFile, args, (err, data) => {
         if (err) return callback(err)
         return callback(null, Object.assign(data, { hash: sha256, name: props.name }))
       })
@@ -217,7 +181,7 @@ class BACKUP {
             props.sha256 = sha256  // translate
             props.uuid = undefined  // clean uuid
             let args = { tmp, dirPath: dir.abspath(), hash: sha256, attrs: props }
-            fileAttr.createFile(args, (err, data) => {
+            fileAttr.call(fileAttr.COMMAND.createFile, args, (err, data) => {
               if (err) return callback(err)
               return callback(null, Object.assign(data, { hash: sha256, name: props.name }))
             })
@@ -251,7 +215,7 @@ class BACKUP {
       if (err) return callback(err)
       if (name) props.bname = name
       let args = { dirPath: dir.abspath(), hash, fileUUID, props }
-      fileAttr.updateFileAttr(args, callback)
+      fileAttr.call(fileAttr.COMMAND.updateFileAttr, args, callback)
     })
   }
 
@@ -263,7 +227,7 @@ class BACKUP {
         target: path.join(dir.abspath(), props.name),
         props
       }
-      fileAttr.updateDirAttr(args, callback)
+      fileAttr.call(fileAttr.COMMAND.updateDirAttr, args, callback)
     })
   }
 
