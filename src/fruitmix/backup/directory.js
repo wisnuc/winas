@@ -1,7 +1,7 @@
 const Directory = require('../vfs/directory')
 const File = require('./file')
 const readdir = require('./readdir')
-const debug = require('debug')('wss:backup-dir')
+const debug = require('debug')('wis:backup-dir')
 
 class Reading extends Directory.prototype.Reading {
   

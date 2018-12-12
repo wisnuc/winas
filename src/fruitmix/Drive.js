@@ -355,7 +355,7 @@ class Drive extends EventEmitter {
       if (!drive || drive.isDeleted) {
         throw Object.assign(new Error(`drive ${driveUUID} not found`), { status: 404 })
       }
-      if (drives.type === 'backup') {
+      if (drive.type === 'backup') {
         return this.updateBackupDrive(user, props, callback)
       }
       delete props.driveUUID
