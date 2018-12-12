@@ -73,19 +73,14 @@ const readdir = (dirPath, uuid, mtime, callback) => {
                     goon()
                   })
                 } else {
-                  let attrName = '.xattr.' + name
-                  let index = attrFiles.findIndex(x => x === attrName)
-                  if (index !== -1) {
-                    fileAttr.readFileXstats(dirPath, name, (err, x2) => {
-                      if (destroyed) return
-                      if (!err) {
-                        x2.forEach(x => x.hash = name)
-                        xstats.push(...x2)
-                      }
-                      goon()
-                    })
-                  } else
+                  fileAttr.readFileXstats(dirPath, name, (err, x2) => {
+                    if (destroyed) return
+                    if (!err) {
+                      x2.forEach(x => x.hash = name)
+                      xstats.push(...x2)
+                    }
                     goon()
+                  })
                 }
               }
               else

@@ -413,7 +413,7 @@ const readFileAttr = (dirPath, hash, fileUUID, callback) => {
 const readFileXstats = (dirPath, hash, callback) => {
   fs.lstat(path.join(dirPath, hash), (err, stats) => {
     if (err) return callback(err)
-    if (!stats.isDirectory() && !stats.isFile()) return callback(EUnsupported(stats))
+    if (!stats.isFile()) return callback(EUnsupported(stats))
     readFileAttrs(dirPath, hash, (err, attrs) => {
       if (err) return callback(err)
       if (!attrs.hasOwnProperty('metadata')) {

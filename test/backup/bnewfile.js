@@ -168,19 +168,19 @@ describe('backup newfile', async () => {
     expect(res.body.entries).to.be.an('array').and.lengthOf(5)
   })
 
-  it.only('upload file * 100', async function () {
+  it.only('upload file * 8000', async function () {
     this.timeout(0)
     let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
     expect(data.uuid).to.equal(data.name)
     let world = await createBPDirAsync(backup.uuid, data.uuid, 'world')
     expect(world.name).to.equal('world')
     let q =  REQ(`/drives/${backup.uuid}/dirs/${world.uuid}/entries`, 'post')
-    for (let i = 0; i < 100; i ++ ){
+    for (let i = 0; i < 8000; i ++ ){
       q.attach(FILES.alonzo.name, FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
     }
     await q.expect(200)
     res =  await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}`, 'get').expect(200)
-    expect(res.body.entries).to.be.an('array').and.lengthOf(100)
+    expect(res.body.entries).to.be.an('array').and.lengthOf(8000)
   })
 
   describe('test archived', () => {
