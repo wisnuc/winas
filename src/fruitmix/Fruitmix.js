@@ -235,6 +235,16 @@ class Fruitmix extends EventEmitter {
   }
 
   /**
+   * handle message for winasd about cloud user update
+   * @param {object} data - cloud message payload
+   */
+  cloudUsersUpdate(data) {
+    if (this.user) {
+      this.user.usersUpdate(data)
+    }
+  }
+
+  /**
    * get userinfo by phicommUserId
    * @param {string} phicommUserId - uuid
    * @return {object} user - return active user

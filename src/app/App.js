@@ -175,6 +175,9 @@ class App extends EventEmitter {
       case 'boundUser':
         this.boot.setBoundUser(message.data)
         break
+      case 'userUpdate':
+        this.fruitmix && this.fruitmix.cloudUsersUpdate(message.data)
+        break
       case 'cloudUsers':
       default:
         break
