@@ -4,7 +4,7 @@ const child = require('child_process')
 const EventEmitter = require('events')
 const os = require('os')
 const crypto = require('crypto')
-const cryptoAsync = require('@ronomon/crypto-async')
+// const cryptoAsync = require('@ronomon/crypto-async')
 
 const rimraf = require('rimraf')
 const debug = require('debug')('HashStream')
@@ -247,6 +247,8 @@ class IPre extends EventEmitter {
 
 /**
 */
+
+/*
 class IPre2 extends EventEmitter {
 
   constructor(rs, filePath, size, sha256) {
@@ -334,6 +336,7 @@ class IPre3 extends EventEmitter {
 
   }
 }
+*/
 
 class IPre4 extends EventEmitter {
 

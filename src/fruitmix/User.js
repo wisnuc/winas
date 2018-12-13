@@ -18,20 +18,144 @@ const INACTIVE_REASON = {
   REJECT: 'reject'
 }
 
-/**
- * user in INACTIVE state
- * * user object have `reason` property
- *    * if `reason` equal number `import`, becourse of import
- *    * if equal number `timeout`, because of invite timeout
- * * admin do
- */
+class Base {
+  constructor (user, ...args) {
+    this.user = user
+    user.state = this
+    this.enter(...args)
+  }
 
-/**
- * user in ACTIVE state
- * * user object have `itime` property
- *    * user have not be confirmed
- * * active user
- */
+  enter () {
+  }
+
+  exit () {
+  }
+
+  setState (nextState, ...args) {
+    this.exit()
+    let NextState = this.user[nextState]
+    new NextState(this.user, ...args)
+  }
+
+  readi () {
+    this.setState('Reading')
+  }
+
+  readn (delay) {
+    this.setState('Pending', delay)
+  }
+
+  readc (callback) {
+    this.setState('Reading', [callback])
+  }
+
+  destroy () {
+    this.exit()
+  }
+}
+
+class Idle extends Base {
+  enter () {
+  }
+
+  exit () {
+  }
+}
+
+class Init extends Base {
+  enter () {
+    this.timer = -1
+  }
+
+  exit () {
+    clearTimeout(this.timer)
+  }
+
+  readn (delay) {
+    assert(Number.isInteger(delay) && delay > 0)
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => this.readi(), delay)
+  }
+}
+
+class Pending extends Base {
+  enter (delay) {
+    assert(Number.isInteger(delay) && delay > 0)
+    this.readn(delay)
+  }
+
+  exit () {
+    clearTimeout(this.timer)
+  }
+
+  readn (delay) {
+    assert(Number.isInteger(delay) && delay > 0)
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => this.readi(), delay)
+  }
+}
+
+class Reading extends Base {
+  enter (callbacks = []) {
+    this.callbacks = callbacks
+    this.pending = undefined
+    this.readdir = null
+    this.fetch()
+  }
+
+  fetch() {
+    this.request = request
+      .get(`${GLOBAL_CONFIG.pipe.baseURL}/s/v1/station/user`)
+      .set('Authorization', this.user.cloudConf.cloudToken)
+      .end((err, res) => {
+        if (err || !res.ok) {
+          err = err || new Error('cloud return error')
+          err.status = 503
+          this.readn(1000)
+        } else {
+          let 
+        }
+      })
+  }
+
+  updateUsers() {
+
+  }
+
+  exit () {
+  }
+
+  readi () {
+    if (!Array.isArray(this.pending)) this.pending = []
+  }
+
+  readn (delay) {
+    if (Array.isArray(this.pending)) {
+
+    } else if (typeof this.pending === 'number') {
+      this.pending = Math.min(this.pending, delay)
+    } else {
+      this.pending = delay
+    }
+  }
+
+  readc (callback) {
+    if (Array.isArray(this.pending)) {
+      this.pending.push(callback)
+    } else {
+      this.pending = [callback]
+    }
+  }
+
+  destroy () {
+    let err = new Error('destroyed')
+    err.code = 'EDESTROYED'
+    this.callbacks.forEach(cb => cb(err))
+    if (Array.isArray(this.pending)) this.pending.forEach(cb => cb(err))
+    this.request.abort()
+    super.destroy()
+  }
+}
 
 /**
 
