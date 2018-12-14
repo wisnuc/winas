@@ -413,8 +413,8 @@ class User extends EventEmitter {
       }
     },
     err => err
-      ? console.log(`user module failed to bind first user to ${boundUser.winasUserId}`, err)
-      : console.log(`user module bound first user to ${boundUser.winasUserId} successfully`))
+      ? console.log(`user module failed to bind first user to ${boundUser.id}`, err)
+      : console.log(`user module bound first user to ${boundUser.id} successfully`))
   }
 
   destroy (callback) {
