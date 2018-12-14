@@ -156,7 +156,7 @@ class Reading extends Base {
         })
         // lost ??
 
-        return lusers
+        return [...lusers]
       }, err => err ? console.log(err) : '')
     }
     else {
