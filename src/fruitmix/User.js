@@ -126,14 +126,14 @@ class Reading extends Base {
       if (firstUser.winasUserId !== owner.id) {
         throw new Error('device owner change!!!!')
       }
-      let users = [owner, ...sharer]
+      let users = [owner, ...data.sharer]
       this.user.storeSave(lusers => {
         // update or create
         users.forEach(u => {
           let x = lusers.find(lx => lx.winasUserId === u.id)
           if (x) {
             x.avatarUrl = u.avatarUrl
-            x.username = u.nickname ? u.nickname : x.username
+            x.username = u.nickName ? u.nickName : x.username
             x.phoneNumber = u.username
             if (x.uuid !== owner.uuid) {
               x.cloud = u.cloud === 1 ? true : false
@@ -143,7 +143,7 @@ class Reading extends Base {
           } else {
             let newUser = {
               uuid: UUID.v4(),
-              username: u.nickname ? u.nickname : u.username,
+              username: u.nickName ? u.nickName : u.username,
               isFirstUser: false,
               status: USER_STATUS.ACTIVE,
               winasUserId: u.id,
@@ -155,6 +155,8 @@ class Reading extends Base {
           }
         })
         // lost ??
+
+        return lusers
       }, err => err ? console.log(err) : '')
     }
     else {
