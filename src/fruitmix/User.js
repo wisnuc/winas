@@ -5,6 +5,7 @@ const DataStore = require('../lib/DataStore')
 const { passwordEncrypt, md4Encrypt } = require('../lib/utils') // eslint-disable-line
 const request = require('superagent')
 const debug = require('debug')('appifi:user')
+const assert = require('assert')
 
 const USER_STATUS = {
   ACTIVE: 'ACTIVE',
@@ -62,22 +63,6 @@ class Idle extends Base {
   }
 }
 
-class Init extends Base {
-  enter () {
-    this.timer = -1
-  }
-
-  exit () {
-    clearTimeout(this.timer)
-  }
-
-  readn (delay) {
-    assert(Number.isInteger(delay) && delay > 0)
-    clearTimeout(this.timer)
-    this.timer = setTimeout(() => this.readi(), delay)
-  }
-}
-
 class Pending extends Base {
   enter (delay) {
     assert(Number.isInteger(delay) && delay > 0)
@@ -106,20 +91,79 @@ class Reading extends Base {
   fetch() {
     this.request = request
       .get(`${GLOBAL_CONFIG.pipe.baseURL}/s/v1/station/user`)
-      .set('Authorization', this.user.cloudConf.cloudToken)
+      .set('Authorization', this.user.cloudConf.cloudToken || '')
       .end((err, res) => {
         if (err || !res.ok) {
           err = err || new Error('cloud return error')
           err.status = 503
           this.readn(1000)
         } else {
-          let 
+          let data = res.body.data
+          if (data) {
+            this.updateUsers(data)
+          }
+        }
+
+        this.callbacks.forEach(callback => callback(err, res.body.data))
+        if (Array.isArray(this.pending)) { // stay in working
+          this.enter(this.pending)
+        } else {
+          if (typeof this.pending === 'number') {
+            this.setState('Pending', this.pending)
+          } else {
+            this.setState('Idle')
+          }
         }
       })
   }
 
-  updateUsers() {
-
+  updateUsers(data) {
+    if (data.owner.length) {
+      let owner = data.owner[0]
+      owner.isFirstUser = true
+      // check owner
+      let firstUser = this.user.users.find(u => u.isFirstUser)
+      if (firstUser.winasUserId !== owner.id) {
+        throw new Error('device owner change!!!!')
+      }
+      let users = [owner, ...sharer]
+      this.user.storeSave(lusers => {
+        // update or create
+        users.forEach(u => {
+          let x = lusers.find(lx => lx.winasUserId === u.id)
+          if (x) {
+            x.avatarUrl = u.avatarUrl
+            x.username = u.nickname ? u.nickname : x.username
+            x.phoneNumber = u.username
+            if (x.uuid !== owner.uuid) {
+              x.cloud = u.cloud === 1 ? true : false
+              x.publicSpace = u.publicSpace === 1 ? true : false
+              // x.createTime = new Date(u.createdAt).getTime() //skip update
+            }
+          } else {
+            let newUser = {
+              uuid: UUID.v4(),
+              username: u.nickname ? u.nickname : u.username,
+              isFirstUser: false,
+              status: USER_STATUS.ACTIVE,
+              winasUserId: u.id,
+              avatarUrl: u.avatarUrl,
+              phoneNumber: u.username,
+              winasUserId: u.id
+            }
+            lusers.push(newUser)
+          }
+        })
+        // lost ??
+      }, err => err ? console.log(err) : '')
+    }
+    else {
+      if (this.user.users.length) {
+        // do what?
+        throw new Error('could not found owner in cloud')
+      }
+      console.log('no user bound')
+    }
   }
 
   exit () {
@@ -185,100 +229,19 @@ class User extends EventEmitter {
       isArray: true
     })
 
-    // observe boundVolume change
-    // for phi
-    if (opts.boundVolumeId) {
-      this.chassisId = opts.boundVolumeId
-      this.chassisStore = new DataStore({
-        file: opts.chassisFile,
-        tmpDir: opts.chassisTmpDir,
-        isArray: true
-      })
-      this.chassisStore.on('Update', this.chassisUpdate.bind(this))
-
-      Object.defineProperty(this, 'chassis', {
-        get () {
-          return this.chassisStore.data || []
-        }
-      })
-    }
-
     this.store.on('Update', (...args) => this.emit('Update', ...args))
+
+    this.once('Update', () => new Pending(this, 200))
 
     Object.defineProperty(this, 'users', {
       get () {
         return this.store.data || []
       }
     })
-
-    // start polling cloud users status
-    // for phi
-    if (GLOBAL_CONFIG.type !== 'winas') this.lookupCloudUsers()
   }
 
-  chassisUpdate () {
-    if (!this.chassisId) return
-    if (!this.chassis.length) {
-      return this.chassisStore.save(data => {
-        return [this.chassisId]
-      }, () => {})
-    }
-    let lastChassisId = this.chassis[0]
-    if (lastChassisId !== this.chassisId) {
-      this.store.save(users => {
-        users.filter(u => u.status === USER_STATUS.ACTIVE)
-          .forEach(u => {
-            if (!u.isFirstUser) {
-              u.status = USER_STATUS.INACTIVE
-              u.reason = INACTIVE_REASON.IMPORT
-              u.password = undefined
-              u.smbPassword = undefined
-            }
-          })
-        console.log('chassisId change:', users)
-        return users
-      }, err => {
-        if (err) return console.log('update users to INACTIVE status error', err)
-        return this.chassisStore.save(data => {
-          return [this.chassisId, ...data]
-        }, () => {})
-      })
-    }
-  }
-
-  /**
-   * lookupCloudUsers
-   * 定期每十分钟轮训一次云端
-   * 获取用户左箭头列表
-   * 排查邀请用户中，超时或拒绝的用户
-   * 把这些用户的状态设置为`inactive`且设置原因
-   */
-  lookupCloudUsers () {
-    setInterval(() => {
-      if (this.cloudConf.cloudToken) {
-        debug(this.cloudConf.cloudToken)
-        request
-          .get('http://sohon2test.phicomm.com/StationManager/nas/getInfo')
-          .set('Authorization', this.cloudConf.cloudToken)
-          .end((err, res) => {
-            if (err || (res.body && res.body.error !== '0')) return debug(err)
-            debug('lookupCloudUsers: ', res.body)
-            if (!res.body.result || !Array.isArray(res.body.result.userList)) return
-            let result = res.body.result.userList.filter(u => u.inviteStatus === 'timeout' || u.inviteStatus === 'reject')
-            if (!result.length) return
-            this.storeSave(users => {
-              result.forEach(r => {
-                let user = users.find(u => u.phicommUserId === r.uid && u.status === USER_STATUS.ACTIVE)
-                if (user) {
-                  user.status = USER_STATUS.INACTIVE
-                  user.reason = r.inviteStatus === 'timeout' ? INACTIVE_REASON.TIMEOUT : INACTIVE_REASON.REJECT
-                }
-              })
-              return [...users]
-            }, err => err ? debug('lookupCloudUsers failed:', err) : debug('lookupCloudUsers success'))
-          })
-      }
-    }, 1000 * 60 * 10)
+  usersUpdate() {
+    this.state && this.state.readi()
   }
 
   getUser (userUUID) {
@@ -331,7 +294,7 @@ class User extends EventEmitter {
 
       if (GLOBAL_CONFIG.type === 'winas') {
         let pU = users.find(u => u.winasUserId === winasUserId)
-        if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
+        if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('winasUserId already exist')
       }
 
       let newUser = {
@@ -339,7 +302,7 @@ class User extends EventEmitter {
         username: props.username,
         isFirstUser,
         phicommUserId: props.phicommUserId, // for phi
-        password: props.password,
+        password: props.password, // for phi
         smbPassword: props.smbPassword,
         status: USER_STATUS.ACTIVE,
         createTime: new Date().getTime(),
@@ -384,56 +347,9 @@ class User extends EventEmitter {
     })
   }
 
-  /**
-  * TODO: to be test
-  * request bootstrap
-  * @param {string} userUUID
-  * @param {object} props { password, encrypted }  - if true, both passwords are considered to be encrypted
-  * @param {function} callback
-  */
   updatePassword (userUUID, props, callback) {
-    try {
-      if (!isUUID(userUUID)) throw new Error(`userUUID ${userUUID} is not a valid uuid`)
-      if (!isNonNullObject(props)) throw new Error('props is not a non-null object')
-      if (!isNonEmptyString(props.password)) throw new Error('password must be a non-empty string if provided')
-      if (props.encrypted !== undefined && typeof props.encrypted !== 'boolean') throw new Error('encrypted must be either true or false')
-
-      // TODO props validation should be in router, I guess
-    } catch (e) {
-      return process.nextTick(() => callback(e))
-    }
-
-    if (GLOBAL_CONFIG.type === 'phi') {
-      request
-      .patch('http://127.0.0.1:3001/v1/user/password')
-      .set('Accept', 'application/json')
-      .send(props)
-      .timeout(30 * 1000)
-      .end((err, res) => {
-        if (err) return callback(err)
-        console.log('update', res.body)
-        this.storeSave(users => {
-          let index = users.findIndex(u => u.uuid === userUUID)
-          if (index === -1) throw new Error('user not found')
-          let nextUser = Object.assign({}, users[index])
-          nextUser.password = res.body.password
-          return [...users.slice(0, index), nextUser, ...users.slice(index + 1)]
-        }, (err, data) => {
-          if (err) return callback(err)
-          return callback(null, data.find(x => x.uuid === userUUID))
-        })
-      })
-    } else {
-      this.storeSave(users => {
-        let index = users.findIndex(u => u.uuid === userUUID)
-        if (index === -1) throw new Error('user not found')
-        let nextUser = Object.assign({}, users[index])
-        nextUser.password = props.encrypted ? props.password : passwordEncrypt(props.password, 10)
-        return [...users.slice(0, index), nextUser, ...users.slice(index + 1)]
-      }, (err, data) => {
-        if (err) return callback(err)
-        return callback(null, data.find(x => x.uuid === userUUID))
-      })
+    if (GLOBAL_CONFIG.type === 'winas '){
+      return callback(Object.assign(new Error('not found'), { status: 404 }))
     }
   }
 
@@ -501,6 +417,7 @@ class User extends EventEmitter {
 
   destroy (callback) {
     this.store.destroy(callback)
+    this.state && this.state.destroy()
   }
 
   basicInfo (user) {
@@ -510,7 +427,8 @@ class User extends EventEmitter {
       isFirstUser: user.isFirstUser,
       phicommUserId: user.phicommUserId,
       phoneNumber: user.phoneNumber,
-      winasUserId: user.winasUserId
+      winasUserId: user.winasUserId,
+      avatarUrl: user.avatarUrl
     }
   }
 
@@ -526,7 +444,8 @@ class User extends EventEmitter {
       status: user.status,
       phoneNumber: user.phoneNumber,
       reason: user.reason, // for phi
-      winasUserId: user.winasUserId
+      winasUserId: user.winasUserId,
+      avatarUrl: user.avatarUrl
     }
   }
 
@@ -568,6 +487,7 @@ class User extends EventEmitter {
       recognized = ['username', 'phicommUserId', 'phoneNumber']
     } else {
       recognized = ['username', 'password', 'phoneNumber', 'winasUserId']
+      return callback(Object.assign(new Error('not found'), { status: 404 }))
     }
     Object.getOwnPropertyNames(props).forEach(key => {
       if (!recognized.includes(key)) throw Object.assign(new Error(`unrecognized prop name ${key}`), { status: 400 })
@@ -598,6 +518,10 @@ class User extends EventEmitter {
   Implement PATCH
   */
   PATCH (user, props, callback) {
+    if (GLOBAL_CONFIG.type === 'winas'){
+      return callback(Object.assign(new Error('not found'), { status: 404 }))
+    }
+
     let userUUID
     let devU = isUUID(props.userUUID) ? this.users.find(u => u.uuid === props.userUUID && u.status !== USER_STATUS.DELETED)
       : this.users.find(u => u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
@@ -633,6 +557,9 @@ class User extends EventEmitter {
   }
 
   DELETE (user, props, callback) {
+    if (GLOBAL_CONFIG.type === 'winas '){
+      return callback(Object.assign(new Error('not found'), { status: 404 }))
+    }
     let userUUID
     let devU = isUUID(props.userUUID) ? this.users.find(u => u.uuid === props.userUUID && u.status !== USER_STATUS.DELETED)
       : this.users.find(u => u.phicommUserId && u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
@@ -645,5 +572,8 @@ class User extends EventEmitter {
 }
 
 User.prototype.USER_STATUS = USER_STATUS
+User.prototype.Idle= Idle
+User.prototype.Pending = Pending
+User.prototype.Reading = Reading
 
 module.exports = User

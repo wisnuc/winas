@@ -34,7 +34,8 @@ const createApp = (users, drives, callback) => {
   fs.renameSync(tmpPath, path.join(tmptest, 'drives.json'))
 
   fruitmix = new Fruitmix({
-    fruitmixDir: tmptest
+    fruitmixDir: tmptest,
+    cloudConf: {}
   })
 
   let app = new App({
@@ -109,6 +110,13 @@ describe('backup newfile', async () => {
         cb(null, res)
       })
   }
+
+  it('just for fun', function(done) {
+    this.timeout(0)
+
+
+
+  })
 
   it('make top dir with metadata return 200', async () => {
     let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
