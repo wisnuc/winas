@@ -178,7 +178,6 @@ class App extends EventEmitter {
       case 'userUpdate':
         this.fruitmix && this.fruitmix.cloudUsersUpdate(message.data)
         break
-      case 'cloudUsers':
       default:
         break
     }

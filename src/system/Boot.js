@@ -1013,7 +1013,7 @@ class Boot extends EventEmitter {
           })
         }
       })
-    }
+    } 
 
     new Probing(this)
 

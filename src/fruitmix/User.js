@@ -19,6 +19,7 @@ const INACTIVE_REASON = {
   REJECT: 'reject'
 }
 
+// while cloud users update , change to reading state
 class Base {
   constructor (user, ...args) {
     this.user = user
@@ -91,7 +92,7 @@ class Reading extends Base {
   fetch() {
     this.request = request
       .get(`${GLOBAL_CONFIG.pipe.baseURL}/s/v1/station/user`)
-      .set('Authorization', this.user.cloudConf.cloudToken || '')
+      .set('Authorization', (this.user.cloudConf && this.user.cloudConf.cloudToken) || '')
       .end((err, res) => {
         if (err || !res.ok) {
           err = err || new Error('cloud return error')

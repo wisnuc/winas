@@ -111,13 +111,6 @@ describe('backup newfile', async () => {
       })
   }
 
-  it('just for fun', function(done) {
-    this.timeout(0)
-
-
-
-  })
-
   it('make top dir with metadata return 200', async () => {
     let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
     expect(data.uuid).to.equal(data.name)
@@ -176,19 +169,31 @@ describe('backup newfile', async () => {
     expect(res.body.entries).to.be.an('array').and.lengthOf(5)
   })
 
-  it.only('upload file * 8000', async function () {
+  it('upload file in rootdir', async () => {
+    await REQ(`/drives/${backup.uuid}/dirs/${backup.uuid}/entries`, 'post')
+      .attach(FILES.alonzo.name, FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
+      .attach(FILES.alonzo.name, FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
+      .attach('1', FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
+      .attach('2', FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
+      .attach('3', FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
+      .expect(200)
+    res =  await REQ(`/drives/${backup.uuid}/dirs/${backup.uuid}`, 'get').expect(200)
+    expect(res.body.entries).to.be.an('array').and.lengthOf(5)
+  })
+
+  it('upload file * 800', async function () {
     this.timeout(0)
     let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
     expect(data.uuid).to.equal(data.name)
     let world = await createBPDirAsync(backup.uuid, data.uuid, 'world')
     expect(world.name).to.equal('world')
     let q =  REQ(`/drives/${backup.uuid}/dirs/${world.uuid}/entries`, 'post')
-    for (let i = 0; i < 8000; i ++ ){
+    for (let i = 0; i < 800; i ++ ){
       q.attach(FILES.alonzo.name, FILES.alonzo.path, JSON.stringify({ op:'newfile', size:FILES.alonzo.size, sha256: FILES.alonzo.hash, bctime: 1555555, bmtime:155555 }))
     }
     await q.expect(200)
     res =  await REQ(`/drives/${backup.uuid}/dirs/${world.uuid}`, 'get').expect(200)
-    expect(res.body.entries).to.be.an('array').and.lengthOf(8000)
+    expect(res.body.entries).to.be.an('array').and.lengthOf(800)
   })
 
   describe('test archived', () => {
@@ -230,7 +235,7 @@ describe('backup newfile', async () => {
     })
   })
 
-  describe.skip('test append', () => {
+  describe('test append', () => {
 
     beforeEach(async function (){
       this.timeout(0)
@@ -246,7 +251,7 @@ describe('backup newfile', async () => {
       process.stdout.write('...done\n')
     })
 
-    it('append return 200', async function() {
+    it.skip('append return 200', async function() {
       this.timeout(0)
       let data = await createBPDirAsync(backup.uuid, backup.uuid, 'hello')
       expect(data.uuid).to.equal(data.name)
