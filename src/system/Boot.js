@@ -288,7 +288,7 @@ class Started extends State {
         })
       }, 24 * 1000 * 60 * 60)
     } else {
-      if (this.ctx.boundUser) fruitmix.bindFirstUser(this.ctx.boundUser)
+      // if (this.ctx.boundUser) fruitmix.bindFirstUser(this.ctx.boundUser)
     }
   }
 
