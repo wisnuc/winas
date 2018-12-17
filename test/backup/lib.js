@@ -52,6 +52,18 @@ const IDS = {
     "ctime": 1544088125167,
     "mtime": 1544088125167,
     "isDeleted": false
+  },
+
+  home: {
+    "uuid": "c8c59b73-2d31-4ee5-a41d-68c681ebbef8",
+    "type": "classic",
+    "privacy": true,
+    "tag": "home",
+    "label": "home",
+    "smb": false,
+    "ctime": 1544088125167,
+    "mtime": 1544088125167,
+    "isDeleted": false
   }
 }
 

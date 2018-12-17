@@ -45,6 +45,7 @@ const readdir = (dirPath, uuid, mtime, callback) => {
             callback(Object.assign(new Error('uuid mismatch'), { code: 'EINSTANCE' }))
           } else {
             fileAttr.readWhiteout(dirPath, (err, data) => {
+              // ignore error
               // convert bname => name
               if (Array.isArray(data)) data.forEach(d => d.name = d.bname)
               let obj = { living: xstats, whiteout: data || [] }
