@@ -208,7 +208,7 @@ describe('xcopy', async () => {
   }
 
 
-  it("move alonzo in root into dir2, 2a47f5ac", async function () {
+  it("move should success", async function () {
     this.timeout(0)
     let homeAlonzoUUID = home.entries.find(x => x.name === FILES.alonzo.name).uuid
     let res = await REQ('/tasks', 'post')
@@ -243,12 +243,13 @@ describe('xcopy', async () => {
       }
     }
 
+    await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
+      .expect(200)
+
     await REQ(`/drives/${HOME.uuid}/dirs/${dir1UUID}`, 'get')
       .expect(200)
-    
 
-    await REQ(`/drives/${HOME.uuid}/dirs/${dir3UUID}`, 'get')
-      .expect(200)
+    await Promise.delay(5000)
   })
 
 })

@@ -1737,7 +1737,7 @@ class VFS extends EventEmitter {
     let arr = []
 
     const match = file => {
-      if (name && !file.name.includes(name)) return
+      if (name && !file.name.toLowerCase().includes(name.toLowerCase())) return
 
       if (types) {
         if (!file.metadata) return
