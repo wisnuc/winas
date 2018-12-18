@@ -1382,9 +1382,14 @@ class VFS extends EventEmitter {
         if (err) return callback(err)
         let oldPath = path.join(this.absolutePath(srcDir), src.name)
         let newPath = path.join(this.absolutePath(dstDir), src.name)
-
         // TODO to do what ???
-        mvfile(oldPath, newPath, policy, callback)
+        mvfile(oldPath, newPath, policy, (...args) => {
+          srcDir.read(err => {
+            dstDir.read(err => {
+              callback(...args)
+            })
+          })
+        })
       })
     })
   }

@@ -51,7 +51,7 @@ const createAppAsync = Promise.promisify(createApp)
 let HOME = Object.assign({}, IDS.home)
 describe('xcopy', async () => {
   let app, token, REQ, dir1UUID, dir2UUID, dir3UUID, dir4UUID, dir1, dir2, dir3, home
-  beforeEach(async () => {
+  before(async () => {
     let users = [ IDS.alice ]
     HOME.owner = IDS.alice.uuid
     let drives = [HOME]
@@ -120,79 +120,19 @@ describe('xcopy', async () => {
         sha256: world.hash,
         op: 'newfile'
       }))
-      .attach(alonzo.name + '1', alonzo.path, JSON.stringify({
-        size: alonzo.size,
-        sha256: alonzo.hash,
-        op: 'newfile'
-      }))
-      .attach(bar.name + '1', bar.path, JSON.stringify({
+      .attach(bar.name + 1, bar.path, JSON.stringify({
         size: bar.size,
         sha256: bar.hash,
         op: 'newfile'
       }))
-      .attach(empty.name + '1', empty.path, JSON.stringify({
-        size: empty.size,
-        sha256: empty.hash,
-        op: 'newfile'
-      }))
-      .attach(hello.name + '1', hello.path, JSON.stringify({
-        size: hello.size,
-        sha256: hello.hash,
-        op: 'newfile'
-      }))
-      .attach(world.name + '1', world.path, JSON.stringify({
-        size: world.size,
-        sha256: world.hash,
-        op: 'newfile'
-      }))
-      .attach(alonzo.name + '2', alonzo.path, JSON.stringify({
-        size: alonzo.size,
-        sha256: alonzo.hash,
-        op: 'newfile'
-      }))
-      .attach(bar.name + '2', bar.path, JSON.stringify({
+      .attach(bar.name + 2, bar.path, JSON.stringify({
         size: bar.size,
         sha256: bar.hash,
         op: 'newfile'
       }))
-      .attach(empty.name + '2', empty.path, JSON.stringify({
-        size: empty.size,
-        sha256: empty.hash,
-        op: 'newfile'
-      }))
-      .attach(hello.name + '2', hello.path, JSON.stringify({
-        size: hello.size,
-        sha256: hello.hash,
-        op: 'newfile'
-      }))
-      .attach(world.name + '2', world.path, JSON.stringify({
-        size: world.size,
-        sha256: world.hash,
-        op: 'newfile'
-      }))
-      .attach(alonzo.name + '3', alonzo.path, JSON.stringify({
-        size: alonzo.size,
-        sha256: alonzo.hash,
-        op: 'newfile'
-      }))
-      .attach(bar.name + '3', bar.path, JSON.stringify({
+      .attach(bar.name + 3, bar.path, JSON.stringify({
         size: bar.size,
         sha256: bar.hash,
-        op: 'newfile'
-      }))
-      .attach(empty.name + '3', empty.path, JSON.stringify({
-        size: empty.size,
-        sha256: empty.hash,
-        op: 'newfile'
-      }))
-      .attach(hello.name + '3', hello.path, JSON.stringify({
-        size: hello.size,
-        sha256: hello.hash,
-        op: 'newfile'
-      }))
-      .attach(world.name + '3', world.path, JSON.stringify({
-        size: world.size,
-        sha256: world.hash,
         op: 'newfile'
       }))
   
@@ -208,48 +148,52 @@ describe('xcopy', async () => {
   }
 
 
-  it("move should success", async function () {
-    this.timeout(0)
-    let homeAlonzoUUID = home.entries.find(x => x.name === FILES.alonzo.name).uuid
-    let res = await REQ('/tasks', 'post')
-      .send({
-        type: 'move',
-        src: {
-          drive: HOME.uuid,
-          dir: dir1UUID
-        },
-        dst: {
-          drive: HOME.uuid,
-          dir: dir4UUID
-        },
-        entries: [
-          'dir3',
-          '1.pdf',
-          'empty',
-          'hello'
-        ] 
-      })
-      .expect(200)
-
-    let taskId = res.body.uuid
-
-    while(true) {
-      await Promise.delay(1000)
-      res = await REQ(`/tasks/${taskId}`, 'get')
+  for (let i = 0; i < 4; i ++) {
+    it("move alonzo in root into dir2, 2a47f5ac", async function () {
+      await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
         .expect(200)
-      if (res.body.finished) {
-        console.log(res.body)
-        break
+      this.timeout(0)
+
+      console.log(app.fruitmix.vfs.forest.timedFiles.array.map(x => [x.name, x.uuid]))
+      let homeAlonzoUUID = home.entries.find(x => x.name === FILES.alonzo.name).uuid
+      let res = await REQ('/tasks', 'post')
+        .send({
+          type: 'move',
+          src: {
+            drive: HOME.uuid,
+            dir: dir1UUID
+          },
+          dst: {
+            drive: HOME.uuid,
+            dir: dir4UUID
+          },
+          entries: [
+            '1.pdf' + (!i ? '' : i),
+          ],
+          policies: {
+            dir: ['keep', null]
+          }
+        })
+        .expect(200)
+  
+      let taskId = res.body.uuid
+  
+      while(true) {
+        await Promise.delay(1000)
+        res = await REQ(`/tasks/${taskId}`, 'get')
+          .expect(200)
+        if (res.body.finished) {
+          console.log(res.body)
+          break
+        }
       }
-    }
 
-    await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
-      .expect(200)
-
-    await REQ(`/drives/${HOME.uuid}/dirs/${dir1UUID}`, 'get')
-      .expect(200)
-
-    await Promise.delay(5000)
-  })
+      console.log(app.fruitmix.vfs.forest.timedFiles.array.map(x => [x.name, x.uuid]))
+      await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
+        .expect(200)
+      await REQ(`/drives/${HOME.uuid}/dirs/${dir1UUID}`, 'get')
+        .expect(200)
+    })
+   }
 
 })
