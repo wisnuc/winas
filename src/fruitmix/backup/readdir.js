@@ -47,7 +47,7 @@ const readdir = (dirPath, uuid, mtime, callback) => {
             fileAttr.readWhiteout(dirPath, (err, data) => {
               // ignore error
               // convert bname => name
-              if (Array.isArray(data)) data.forEach(d => d.name = d.bname)
+              if (Array.isArray(data)) data.forEach(d => (d.name = d.bname, d.type = 'file'))
               let obj = { living: xstats, whiteout: data || [] }
               callback(null, obj, x2.mtime, x2.mtime !== x1.mtime)
             })
