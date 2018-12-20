@@ -128,7 +128,7 @@ class Reading extends Base {
     this.readdir = readdir(dirPath, uuid, _mtime, (err, xstats, mtime, transient) => {
       // change to debug
       debug('readdir done', err || (xstats ? xstats.length : xstats), mtime, transient)
-
+      let dirty = false
       if (dirPath !== this.dir.abspath()) {
         err = new Error('path changed during readdir operation')
         err.code = 'EINTERRUPTED'
@@ -151,7 +151,9 @@ class Reading extends Base {
         /**
         Don't bypass update children! Do it anyway. Node.js fs timestamp resolution is not adequate.
         */
-        this.updateChildren(xstats)
+        let xs = this.updateChildren(xstats)
+        dirty = !(xs.length === xstats.length)
+        xstats = xs
         if (mtime !== this.dir.mtime && !transient) {
           this.dir.mtime = mtime
         }
@@ -166,7 +168,7 @@ class Reading extends Base {
         this.exit()
         if (typeof this.pending === 'number') {
           new Pending(this.dir, this.pending)
-        } else if (xstats && transient) {
+        } else if ((xstats && transient) || dirty) {
           new Pending(this.dir, 500)
         } else {
           new Idle(this.dir)
@@ -178,7 +180,8 @@ class Reading extends Base {
   /**
   This is the ONLY place updating in-memory fs object tree.
   */
-  updateChildren (xstats) {
+  updateChildren (xs) {
+    let xstats = [...xs]
     // total
     this.dir.dirCount = xstats.filter(x => x.type === 'directory').length
     this.dir.fileCount = xstats.filter(x => x.type === 'file').length
@@ -239,10 +242,26 @@ class Reading extends Base {
     }, [])
     lost.forEach(c => c.destroy(true))
 
-    // create new
-    map.forEach(x => x.type === 'file'
-      ? new File(this.dir.ctx, this.dir, x)
-      : new Directory(this.dir.ctx, this.dir, x))
+    // check race then notify race and create new
+    map.forEach(x => {
+      if (x.type === 'file') {
+        let find = this.dir.ctx.fileMap.get(x.uuid)
+        if (find) {
+          find.parent && find.parent.read()
+          return xstats.splice(xstats.findIndex(f => f === x), 1)
+        }
+        new File(this.dir.ctx, this.dir, x)
+      } else {
+        let find = this.dir.ctx.uuidMap.get(x.uuid)
+        if (find) {
+          find.parent && find.parent.read()
+          return xstats.splice(xstats.findIndex(f => f === x), 1)
+        }
+        new Directory(this.dir.ctx, this.dir, x)
+      }
+    })
+    // return unrace xstats
+    return xstats
   }
 
   /**
