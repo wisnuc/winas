@@ -180,8 +180,8 @@ class Reading extends Base {
   /**
   This is the ONLY place updating in-memory fs object tree.
   */
-  updateChildren (xs) {
-    let xstats = [...xs]
+  updateChildren (xstats) {
+    let xs = [...xstats]
     // total
     this.dir.dirCount = xstats.filter(x => x.type === 'directory').length
     this.dir.fileCount = xstats.filter(x => x.type === 'file').length
@@ -248,20 +248,20 @@ class Reading extends Base {
         let find = this.dir.ctx.fileMap.get(x.uuid)
         if (find) {
           find.parent && find.parent.read()
-          return xstats.splice(xstats.findIndex(f => f === x), 1)
+          return xs.splice(xs.findIndex(f => f === x), 1)
         }
         new File(this.dir.ctx, this.dir, x)
       } else {
         let find = this.dir.ctx.uuidMap.get(x.uuid)
         if (find) {
           find.parent && find.parent.read()
-          return xstats.splice(xstats.findIndex(f => f === x), 1)
+          return xs.splice(xs.findIndex(f => f === x), 1)
         }
         new Directory(this.dir.ctx, this.dir, x)
       }
     })
     // return unrace xstats
-    return xstats
+    return xs
   }
 
   /**
