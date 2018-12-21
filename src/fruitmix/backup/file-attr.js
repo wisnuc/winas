@@ -221,13 +221,15 @@ const createFile = ({ tmp, dirPath, hash, attrs }, callback) => {
   else if (archived) return callback(new Error('archived must typeof boolean or undefined'))
   let target = path.join(dirPath, hash)
   fs.link(tmp, target, err => {
-    if (!err || (err && err.code === 'EEXIST')) {
-      // ignore EEXIST error
-      let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
-      createFileAttr({ dirPath, hash, props: attr }, callback)
-    } else {
-      callback(err)
-    }
+    rimraf(tmp, () => { // ignore error
+      if (!err || (err && err.code === 'EEXIST')) {
+        // ignore EEXIST error
+        let attr = { uuid, archived, bname, bctime, bmtime, fingerprint, desc }
+        createFileAttr({ dirPath, hash, props: attr }, callback)
+      } else {
+        callback(err)
+      }
+    })
   })
 }
 
