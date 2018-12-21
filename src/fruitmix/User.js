@@ -155,7 +155,7 @@ class Reading extends Base {
             lusers.push(newUser)
           }
         })
-        // lost ??
+        //TODO: lost ??
 
         return [...lusers]
       }, err => err ? console.log(err) : '')
