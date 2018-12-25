@@ -1333,6 +1333,7 @@ class VFS extends EventEmitter {
       if (err) return callback(err)
       this.DIR(user, { driveUUID: dst.drive, dirUUID: dst.dir }, (err, dstDir) => {
         if (err) return callback(err)
+        if (dir.nodepath().map(dir => dir.uuid).includes(src.dir)) return callback(new Error('can not move dir to subdir'))
         let count = names.length 
         let map = new Map()
         names.forEach(name => {
