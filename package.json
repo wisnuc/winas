@@ -29,16 +29,16 @@
     "btest": "NODE_PATH=. NODE_ENV=dev_winas nodemon --ignore tmptest --ignore out --exec mocha --recursive --sort"
   },
   "dependencies": {
-    "bcrypt": "^3.0.2",
+    "bcrypt": "^3.0.3",
     "bcryptjs": "^2.4.3",
-    "bluebird": "^3.5.0",
+    "bluebird": "^3.5.3",
     "body-parser": "1.18.3",
     "canonical-json": "0.0.4",
     "config": "^3.0.1",
     "cookie-parser": "~1.4.3",
     "crypt3": "^1.0.0",
     "cuint": "^0.2.2",
-    "debug": "~4.1.0",
+    "debug": "~4.1.1",
     "deep-equal": "^1.0.1",
     "deep-freeze": "0.0.1",
     "dicer": "^0.2.5",
@@ -69,7 +69,7 @@
     "superagent": "^4.0.0",
     "transmission": "^0.4.9",
     "uuid": "^3.3.2",
-    "validator": "^10.9.0",
+    "validator": "^10.10.0",
     "winston": "^3.1.0",
     "xxhash": "^0.2.4",
     "xxhashjs": "^0.2.2"
@@ -78,7 +78,7 @@
     "aglio": "^2.3.0",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
-    "eslint": "^5.10.0",
+    "eslint": "^5.11.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-config-standard": "^12.0.0",
     "eslint-plugin-import": "^2.14.0",
@@ -100,8 +100,8 @@
     "sinon": "^7.2.2",
     "sloc": "^0.2.1",
     "supertest": "^3.3.0",
-    "uglifyjs-webpack-plugin": "^2.0.1",
-    "webpack": "^4.28.1"
+    "uglifyjs-webpack-plugin": "^2.1.0",
+    "webpack": "^4.28.2"
   },
   "wisnuc": {
     "ubuntu-server-amd64": {

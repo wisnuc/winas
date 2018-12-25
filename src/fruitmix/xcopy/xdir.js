@@ -287,7 +287,7 @@ class Preparing extends State {
        nmove2   mvdirs in nfs                 when src & dst @ same fs
     */
     if (type === 'copy' || type === 'icopy' || type === 'imove') { // mkdirs in vfs
-      props = { driveUUID: dstDrive, dirUUID: dir.dst.uuid, names, policy }
+      props = { driveUUID: dstDrive, dirUUID: dir.dst.uuid, names, policy, src: { drive: srcDrive, dir: dir.src.uuid } }
       f = vfs.MKDIRS.bind(vfs)
     } else if (type === 'move') { // mvdirs in vfs
       props = {

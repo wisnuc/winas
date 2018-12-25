@@ -1137,22 +1137,27 @@ class VFS extends EventEmitter {
   @param {Policy} policy
   */
   MKDIRS (user, props, callback) {
-    this.DIR(user, props, (err, dir) => {
-      if (err) return callback(err) 
-      let { names, policy } = props
-      let count = names.length
-      let map = new Map()
-      names.forEach(name => {
-        let target = path.join(this.absolutePath(dir), name)
-        mkdir(target, policy, (err, stat, resolved) => {
-          map.set(name, { err, stat, resolved }) 
-          if (!--count) {
-            // TODO
-            dir.read((err, xstats) => {
-              if (err) return callback(err)
-              callback(null, map)
-            })
-          }
+
+    this.DIR(user, props.src, (err, srcDir) => {
+      if (err) return callback(err)
+      this.DIR(user, props, (err, dir) => {
+        if (err) return callback(err)
+        if (dir.nodepath().map(d => d.uuid).includes(srcDir.dir)) return callback(new Error('can not move dir to subdir'))
+        let { names, policy } = props
+        let count = names.length
+        let map = new Map()
+        names.forEach(name => {
+          let target = path.join(this.absolutePath(dir), name)
+          mkdir(target, policy, (err, stat, resolved) => {
+            map.set(name, { err, stat, resolved }) 
+            if (!--count) {
+              // TODO
+              dir.read((err, xstats) => {
+                if (err) return callback(err)
+                callback(null, map)
+              })
+            }
+          })
         })
       })
     })
@@ -1333,7 +1338,7 @@ class VFS extends EventEmitter {
       if (err) return callback(err)
       this.DIR(user, { driveUUID: dst.drive, dirUUID: dst.dir }, (err, dstDir) => {
         if (err) return callback(err)
-        if (dir.nodepath().map(dir => dir.uuid).includes(src.dir)) return callback(new Error('can not move dir to subdir'))
+        if (dstDir.nodepath().map(dir => dir.uuid).includes(src.dir)) return callback(new Error('can not move dir to subdir'))
         let count = names.length 
         let map = new Map()
         names.forEach(name => {
