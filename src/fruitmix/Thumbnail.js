@@ -37,7 +37,7 @@ const sortObject = o => Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r),
 
 // parse query to opts
 const parseQuery = query => {
-  let { width, height, modifier, autoOrient } = query
+  let { width, height, modifier, autoOrient, colors } = query
 
   if (width !== undefined) {
     width = parseInt(width)
@@ -47,6 +47,11 @@ const parseQuery = query => {
   if (height !== undefined) {
     height = parseInt(height)
     if (!Number.isInteger(height) || height === 0 || height > 4096) return EINVAL('invalid height')
+  }
+
+  if (colors !== undefined) {
+    colors = parseInt(colors)
+    if (!Number.isInteger(colors) || colors === 0 || colors > 4096) return EINVAL('invalid colors')
   }
 
   if (!width && !height) return EINVAL('no geometry')
@@ -59,7 +64,7 @@ const parseQuery = query => {
     autoOrient = true
   }
 
-  return { width, height, modifier, autoOrient }
+  return { width, height, modifier, autoOrient, colors }
 }
 
 // hash stringified option object
@@ -100,6 +105,10 @@ const genArgs = (src, tmp, opts, type) => {
   let args = []
   args.push(src + '[0]')
   if (opts.autoOrient) args.push('-auto-orient')
+  if (opts.colors) {
+    args.push('-colors')
+    args.push(opts.colors)
+  }
   args.push('-thumbnail')
   args.push(geometry(opts.width, opts.height, opts.modifier))
   args.push(tmp)

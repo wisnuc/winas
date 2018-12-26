@@ -52,6 +52,7 @@ class MediaApi {
         if (props.height) q.height = props.height
         if (props.modifiers) q.modifiers = props.modifiers
         if (props.autoOrient) q.autoOrient = props.autoOrient
+        if (props.colors) q.colors = props.colors
         
         this.vfs.getMedia(user, { fingerprint, both: true }, (err, both) => {
           if (err) return callback(err)  
@@ -64,6 +65,7 @@ class MediaApi {
 
           /** workaround, drop auto-orient option for video **/
           if (isVideo) q.autoOrient = undefined
+          if (isVideo) q.colors = undefined
           let tps = this.thumbnail.genProps(fingerprint, q)
 
           fs.lstat(tps.path, (err, stat) => {

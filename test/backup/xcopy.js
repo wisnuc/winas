@@ -147,7 +147,7 @@ describe('xcopy', async () => {
     })
   }
 
-  it("move alonzo in root into dir2, 2a47f5ac", async function () {
+  it.skip("move alonzo in root into dir2, 2a47f5ac", async function () {
     await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
       .expect(200)
     this.timeout(0)
@@ -187,6 +187,17 @@ describe('xcopy', async () => {
       .expect(200)
     await REQ(`/drives/${HOME.uuid}/dirs/${dir1UUID}`, 'get')
       .expect(200)
+  })
+
+  it("get media", async function () {
+    this.timeout(0)
+    REQ(`/media/${FILES.alonzo.hash}?width=200&height=200&colors=16&alt=thumbnail`, 'get')
+      .expect(200)
+      .pipe(fs.createWriteStream('hahahahaha'))
+      REQ(`/media/${FILES.alonzo.hash}?width=200&height=200&alt=thumbnail`, 'get')
+      .expect(200)
+      .pipe(fs.createWriteStream('hahahahah2a'))
+
   })
 
   /*
