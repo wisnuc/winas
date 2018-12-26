@@ -151,8 +151,6 @@ describe('xcopy', async () => {
     await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
       .expect(200)
     this.timeout(0)
-
-    console.log(app.fruitmix.vfs.forest.timedFiles.array.map(x => [x.name, x.uuid]))
     let homeAlonzoUUID = home.entries.find(x => x.name === FILES.alonzo.name).uuid
     let res = await REQ('/tasks', 'post')
       .send({
@@ -163,7 +161,7 @@ describe('xcopy', async () => {
         },
         dst: {
           drive: HOME.uuid,
-          dir: dir4UUID
+          dir: dir2UUID
         },
         entries: [
           'dir1'

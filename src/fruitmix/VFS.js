@@ -1140,9 +1140,10 @@ class VFS extends EventEmitter {
 
     this.DIR(user, props.src, (err, srcDir) => {
       if (err) return callback(err)
+      let srcUUIDs = srcDir.children.filter(c => props.names.includes(c.name)).map(d => d.uuid)
       this.DIR(user, props, (err, dir) => {
         if (err) return callback(err)
-        if (dir.nodepath().map(d => d.uuid).includes(srcDir.dir)) return callback(new Error('can not move dir to subdir'))
+        if (!srcUUIDs.every(s => !dir.nodepath().map(d => d.uuid).includes(s))) return callback(new Error('can not move dir to subdir'))
         let { names, policy } = props
         let count = names.length
         let map = new Map()
@@ -1336,9 +1337,10 @@ class VFS extends EventEmitter {
     let { src, dst, names, policy } = props
     this.DIR(user, { driveUUID: src.drive, dirUUID: src.dir }, (err, srcDir) => {
       if (err) return callback(err)
+      let srcUUIDs = srcDir.children.filter(c => props.names.includes(c.name)).map(d => d.uuid)
       this.DIR(user, { driveUUID: dst.drive, dirUUID: dst.dir }, (err, dstDir) => {
         if (err) return callback(err)
-        if (dstDir.nodepath().map(dir => dir.uuid).includes(src.dir)) return callback(new Error('can not move dir to subdir'))
+        if (!srcUUIDs.every(s => !dstDir.nodepath().map(d => d.uuid).includes(s))) return callback(new Error('can not move dir to subdir'))
         let count = names.length 
         let map = new Map()
         names.forEach(name => {
