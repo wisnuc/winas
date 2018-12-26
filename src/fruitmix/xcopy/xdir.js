@@ -96,7 +96,8 @@ class Mkdir extends State {
         driveUUID: dstDrive,
         dirUUID: this.ctx.parent.dst.uuid,
         names,
-        policy
+        policy,
+        src: { driveUUID: srcDrive, dirUUID: pdir.src.uuid }
       }
       f = vfs.MKDIRS.bind(vfs)
     } else if (type === 'move') {
