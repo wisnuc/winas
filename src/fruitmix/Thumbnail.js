@@ -111,6 +111,10 @@ const genArgs = (src, tmp, opts, type) => {
   }
   args.push('-thumbnail')
   args.push(geometry(opts.width, opts.height, opts.modifier))
+  args.push('-background')
+  args.push('white')
+  args.push('-alpha')
+  args.push('background')
   args.push(tmp)
   return args
 }
