@@ -58,9 +58,13 @@ class Base {
 
 class Idle extends Base {
   enter () {
+    this.timer = setTimeout(() => {
+      this.readi()
+    }, 1000 * 60 * 60 * 3)
   }
 
   exit () {
+    if (this.timer) clearTimeout(this.timer)
   }
 }
 
@@ -97,7 +101,7 @@ class Reading extends Base {
         if (err || !res.ok) {
           err = err || new Error('cloud return error')
           err.status = 503
-          this.readn(1000)
+          this.readn(1000 * 60)
         } else {
           let data = res.body.data
           if (data) {
