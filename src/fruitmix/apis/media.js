@@ -80,7 +80,7 @@ class MediaApi {
             if (clientCanceled) return callback(new Error('client canceled'))
             if (err && err.code === 'ENOENT') {
               let cb = (...args) => {
-                cancelFunc = undefined
+                convertCancelFunc = undefined
                 callback(...args)
               }
               let cancelFunc = this.thumbnail.convert(tps, both.path, both.metadata, cb)
