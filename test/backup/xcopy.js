@@ -147,7 +147,7 @@ describe('xcopy', async () => {
     })
   }
 
-  it.skip("move alonzo in root into dir2, 2a47f5ac", async function () {
+  it("move alonzo in root into dir2, 2a47f5ac", async function () {
     await REQ(`/drives/${HOME.uuid}/dirs/${dir4UUID}`, 'get')
       .expect(200)
     this.timeout(0)

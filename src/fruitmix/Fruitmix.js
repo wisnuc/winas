@@ -14,7 +14,6 @@ const UUID = require('uuid')
 
 const User = require('./User')
 const Drive = require('./Drive')
-const MediaMap = require('../media/persistent')
 const Thumbnail = require('./Thumbnail')
 const VFS = require('./VFS')
 const NFS = require('./NFS')
@@ -42,7 +41,6 @@ Fruitmix has the following structure:
   tag,
 
   xstat,
-  mediaMap,
   forest,
   vfs,
 
@@ -140,11 +138,9 @@ class Fruitmix extends EventEmitter {
     })
 
     let metaPath = path.join(this.fruitmixDir, 'metadataDB.json')
-    this.mediaMap = new MediaMap(metaPath, this.tmpDir) // TODO suffix tmpdir ?
 
     let vfsOpts = {
-      fruitmixDir: this.fruitmixDir,
-      mediaMap: this.mediaMap
+      fruitmixDir: this.fruitmixDir
     }
     this.vfs = new VFS(vfsOpts, this.user, this.drive, this.tag)
 
