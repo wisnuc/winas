@@ -402,10 +402,14 @@ class App extends EventEmitter {
         this.fruitmix.apis[resource][verb](req.user,
           Object.assign({}, req.query, req.body, req.params, { req }), f(res, next))
 
-      if (opts && opts.auth === 'allowAnonymous') {
-        router[method](rpath, stub, anonymous, auth.jwt(), authenticated)
-      } else if (opts && typeof opts.auth === 'function') {
-        router[method](rpath, stub, opts.auth(auth), authenticated)
+      if (opts) {
+        if (opts.auth === 'allowAnonymous') {
+          router[method](rpath, stub, anonymous, auth.jwt(), opts.needReq ? needReq : authenticated)
+        } else if (typeof opts.auth === 'function') {
+          router[method](rpath, stub, opts.auth(auth), opts.needReq ? needReq : authenticated)
+        } else {
+          router[method](rpath, stub, auth.jwt(), opts.needReq ? needReq : authenticated)
+        }
       } else {
         if (verb === 'POSTFORM') {
           router[method](rpath, stub, auth.jwt(), (req, res, next) => {
@@ -423,11 +427,7 @@ class App extends EventEmitter {
             }
           })
         } else {
-          if (opts && opts.needReq) {
-            router[method](rpath, stub, auth.jwt(), needReq)
-          } else {
-            router[method](rpath, stub, auth.jwt(), authenticated)
-          }
+          router[method](rpath, stub, auth.jwt(), authenticated)
         }
       }
     })

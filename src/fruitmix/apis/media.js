@@ -19,6 +19,14 @@ class MediaApi {
 
   GET (user, props, callback) {
     debug('get', props)
+    let clientCanceled = false, convertCancelFunc = undefined
+
+    props.req.once('close', () => {
+      clientCanceled = true
+      if (typeof convertCancelFunc === 'function') {
+        convertCancelFunc()
+      }
+    })
 
     if (!user) {
       let fingerprint
@@ -56,7 +64,7 @@ class MediaApi {
         
         this.vfs.getMedia(user, { fingerprint, both: true }, (err, both) => {
           if (err) return callback(err)  
-
+          if (clientCanceled) return callback(new Error('client canceled'))
           /**
           This list must be kept in sync with video format defined in lib/file-meta
           */
@@ -69,8 +77,17 @@ class MediaApi {
           let tps = this.thumbnail.genProps(fingerprint, q)
 
           fs.lstat(tps.path, (err, stat) => {
+            if (clientCanceled) return callback(new Error('client canceled'))
             if (err && err.code === 'ENOENT') {
-              this.thumbnail.convert(tps, both.path, both.metadata, callback)
+              let cb = (...args) => {
+                cancelFunc = undefined
+                callback(...args)
+              }
+              let cancelFunc = this.thumbnail.convert(tps, both.path, both.metadata, cb)
+              convertCancelFunc = () => {
+                cancelFunc()
+                callback(new Error('client canceled'))
+              }
             } else if (err) {
               callback(err)
             } else {
