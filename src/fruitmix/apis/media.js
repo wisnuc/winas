@@ -21,7 +21,7 @@ class MediaApi {
     debug('get', props)
     let clientCanceled = false, convertCancelFunc = undefined
 
-    props.req.once('close', () => {
+    props.req && props.req.once('close', () => {
       clientCanceled = true
       if (typeof convertCancelFunc === 'function') {
         convertCancelFunc()

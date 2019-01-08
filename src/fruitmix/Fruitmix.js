@@ -137,7 +137,7 @@ class Fruitmix extends EventEmitter {
       isArray: false
     })
 
-    let metaPath = path.join(this.fruitmixDir, 'metadataDB.json')
+    // let metaPath = path.join(this.fruitmixDir, 'metadataDB.json')
 
     let vfsOpts = {
       fruitmixDir: this.fruitmixDir
