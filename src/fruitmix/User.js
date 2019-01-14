@@ -89,7 +89,7 @@ class Reading extends Base {
   enter (callbacks = []) {
     this.callbacks = callbacks
     this.pending = undefined
-    this.readdir = null
+    this.request = null
     this.fetch()
   }
 
