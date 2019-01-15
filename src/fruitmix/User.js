@@ -135,32 +135,46 @@ class Reading extends Base {
       this.user.storeSave(lusers => {
         // update or create
         users.forEach(u => {
+          if (!u.username) throw new Error('user phoneNumber can not be null')
           let x = lusers.find(lx => lx.winasUserId === u.id)
           if (x) {
             x.avatarUrl = u.avatarUrl
-            x.username = u.nickName ? u.nickName : x.username
-            x.phoneNumber = u.username
+            x.username = u.nickName || x.username
             if (x.uuid !== owner.uuid) {
-              x.cloud = u.cloud === 1 ? true : false
-              x.publicSpace = u.publicSpace === 1 ? true : false
-              // x.createTime = new Date(u.createdAt).getTime() //skip update
+              x.cloud = !!u.cloud
+              x.publicSpace = !!u.publicSpace
             }
+            // phone update
+            if(x.phoneNumber !== u.username) {
+              x.phoneNumber = u.username
+            }
+
+            x.status = u.delete === 1 ? USER_STATUS.DELETED
+              : u.disable === 1? USER_STATUS.INACTIVE
+                : USER_STATUS.ACTIVE
           } else {
+            // PhoneNumber Exist Error
+            let pu = lusers.find(x => x.phoneNumber === u.username)
+            if (pu && pu.status !== USER_STATUS.DELETED) throw new Error('phoneNumber already exist')
+
             let newUser = {
               uuid: UUID.v4(),
-              username: u.nickName ? u.nickName : u.username,
+              username: u.nickName || u.username,
               isFirstUser: false,
-              status: USER_STATUS.ACTIVE,
               winasUserId: u.id,
               avatarUrl: u.avatarUrl,
               phoneNumber: u.username,
-              winasUserId: u.id
-            }
+              winasUserId: u.id,
+              cloud: !!u.cloud,
+              publicSpace: !!u.publicSpace
+            } 
+            //set user state
+            newUser.status = u.delete === 1 ? USER_STATUS.DELETED
+              : u.disable === 1? USER_STATUS.INACTIVE
+                : USER_STATUS.ACTIVE
             lusers.push(newUser)
           }
         })
-        //TODO: lost ??
-
         return [...lusers]
       }, err => err ? console.log(err) : '')
     }
@@ -493,6 +507,7 @@ class User extends EventEmitter {
     if (GLOBAL_CONFIG.type === 'phi') {
       recognized = ['username', 'phicommUserId', 'phoneNumber']
     } else {
+      // winas not allow
       recognized = ['username', 'password', 'phoneNumber', 'winasUserId']
       return callback(Object.assign(new Error('not found'), { status: 404 }))
     }
