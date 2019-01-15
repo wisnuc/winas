@@ -66,8 +66,8 @@ const winas = {
     isPrivate: false,
     visibleInPublicDrive: true,
   },
-  smbAutoStart: true,
-  dlnaAutoStart: true
+  smbAutoStart: false,
+  dlnaAutoStart: false
 }
 
 /**
