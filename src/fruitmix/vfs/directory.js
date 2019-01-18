@@ -1,12 +1,18 @@
 const path = require('path')
 const fs = require('fs')
 const assert = require('assert')
+const crypto = require('crypto')
 
 const mkdirp = require('mkdirp')
+const UUID = require('uuid')
+const rimraf = require('rimraf')
 
 const Node = require('./node')
 const File = require('./file')
 const readdir = require('./readdir')
+const { mkdir, mkfile, mvdir, mvfile, clone, send } = require('./underlying')
+const { readXstat, forceXstat, updateFileTags } = require('../../lib/xstat')
+const { btrfsConcat, btrfsClone, btrfsClone2 } = require('../../lib/btrfs')
 
 const Debug = require('debug')
 const debug = process.env.hasOwnProperty('DEBUG') ? Debug('directory') : () => {}
@@ -355,6 +361,9 @@ class Directory extends Node {
 
     this.ctx.indexDirectory(this)
     new Init(this)
+    // queue run function
+    // function(done())
+    this.taskQueue = []
   }
 
   /**
@@ -567,6 +576,249 @@ class Directory extends Node {
 
     return { dirCount, fileCount, fileTotalSize }
   }
+
+
+  /***********************************************************/
+  /***********************************************************/
+
+  addTask(f) {
+    this.taskQueue.push(f)
+  }
+
+  getTask() {
+    return this.taskQueue.shift()
+  }
+
+  MKDIR({ name, policy, read }, cb) {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      const target = path.join(this.abspath(), name)
+      mkdir(target, policy, (err, xstat, resolved) => {
+        if (err) return callback(err)
+        // this only happens when skip diff policy taking effect
+        if (!xstat) return callback(null, null, resolved)
+        if (!read) return callback(null, xstat, resolved)
+        this.read((err, xstats) => {
+          if (err) return callback(err)
+          let found = xstats.find(x => x.uuid === xstat.uuid)
+          if (!found) {
+            let err = new Error(`failed to find newly created directory`)
+            err.code = 'ENOENT'
+            err.xcode = 'EDIRTY'
+            callback(err)
+          } else {
+            callback(null, found, resolved)
+          }
+        })
+      })
+    }
+    this.addTask(F)
+  }
+
+  RENAME(props, cb) {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let { fromName, toName, policy } = props
+      policy = policy || [null, null]
+      
+      let src = path.join(this.abspath(), fromName) 
+      let dst = path.join(this.abspath(), toName)
+      readXstat(src, (err, srcXstat) => {
+        if (err) return callback(err)
+        if (srcXstat.type === 'directory') {
+          mvdir(src, dst, policy, (err, xstat, resolved) => {
+            if (err) return callback(err)
+            this.read((err, xstats) => {
+              if (err) return callback(err)
+              return callback(null, xstat, resolved) 
+            })
+          })
+        } else {
+          mvfile(src, dst, policy, (err, xstat, resolved) => {
+            if (err) return callback(err)
+            this.read((err, xstats) => {
+              if (err) return callback(err)
+              return callback(null, xstat, resolved) 
+            })
+          })
+        }
+      })
+    }
+    this.addTask(F)
+  }
+
+  REMOVE(props, cb) {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let { name } = props 
+      let target = path.join(this.abspath(), name)
+      rimraf(target, err => callback(err))
+    }
+    this.addTask(F)
+  }
+
+  NEWFILE(props, cb) {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      if (!props.policy) props.policy = [null, null]
+      let target = path.join(this.abspath(), props.name)
+      mkfile(target, props.data, props.sha256 || null, props.policy, callback)
+    }
+    this.addTask(F)
+  }
+
+  TMPFILE() {
+    return path.join(global.TMPDIR(), UUID.v4())
+  }
+
+  APPEND(props, cb) {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let { name, hash, data, size, sha256 } = props
+
+      let target = path.join(this.abspath(), name)  
+      readXstat(target, (err, xstat) => {
+        if (err) {
+          if (err.code === 'ENOENT' || err.code === 'EISDIR' || err.xcode === 'EUNSUPPORTED') err.status = 403
+          return callback(err)
+        }
+
+        if (xstat.type !== 'file') {
+          let err = new Error('not a file')
+          err.code = 'EISDIR'
+          err.status = 403
+          return callback(err)
+        }
+
+        if (xstat.size % (1024 * 1024 * 1024) !== 0) {
+          let err = new Error('not a multiple of 1G')
+          err.code = 'EALIGN' // kernel use EINVAL for non-alignment of sector size
+          err.status = 403
+          return callback(err)
+        }
+
+        if (xstat.hash !== hash) {
+          let err = new Error(`hash mismatch, actual: ${xstat.hash}`)
+          err.code = 'EHASHMISMATCH' 
+          err.status = 403
+          return callback(err)
+        }
+
+        let tmp = this.TMPFILE() 
+
+        // concat target and data to a tmp file
+        // TODO sync before op
+        btrfsConcat(tmp, [target, data], err => {
+          if (err) return callback(err)
+          fs.lstat(target, (err, stat) => {
+            if (err) return callback(err)
+            if (stat.mtime.getTime() !== xstat.mtime) {
+              let err = new Error('race detected')
+              err.code = 'ERACE'
+              err.status = 403
+              return callback(err)
+            }
+
+            const combineHash = (a, b) => {
+              let a1 = typeof a === 'string' ? Buffer.from(a, 'hex') : a
+              let b1 = typeof b === 'string' ? Buffer.from(b, 'hex') : b
+              let hash = crypto.createHash('sha256')
+              hash.update(Buffer.concat([a1, b1]))
+              let digest = hash.digest('hex')
+              return digest
+            }
+
+            // TODO preserve tags
+            forceXstat(tmp, { 
+              uuid: xstat.uuid, 
+              hash: xstat.size === 0 ? sha256 : combineHash(hash, sha256)
+            }, (err, xstat2) => {
+              if (err) return callback(err)
+              // TODO dirty
+              xstat2.name = name
+              fs.rename(tmp, target, err => err ? callback(err) : callback(null, xstat2))
+            })
+          })
+        })
+      })
+    }
+    this.addTask(F)
+  }
+
+  ADDTAGS() {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let tags = Array.from(new Set(props.tags)).sort()   
+      let filePath = path.join(this.abspath(), props.name)   
+
+      readXstat(filePath, (err, xstat) => {
+        if (err) return callback(err)
+        if (xstat.type !== 'file') {
+          let err = new Error('not a file')
+          err.code = 'ENOTFILE'
+          return callback(err)
+        }
+
+        let oldTags = xstat.tags || []
+        let newTags = Array.from(new Set([...oldTags, ...tags])).sort()
+
+        if (newTags.length === oldTags.length) {
+          callback(null, xstat)
+        } else {
+          updateFileTags(filePath, xstat.uuid, newTags, callback)
+        }
+      })
+    }
+    this.addTask(F)
+  }
+
+  REMOVETAGS() {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let filePath = path.join(this.abspath(), props.name)
+      readXstat(filePath, (err, xstat) => {
+        if (err) return callback(err)
+        if (xstat.type !== 'file') {
+          let err = new Error('not a file')
+          err.code = 'ENOTFILE'
+          return callback(err)
+        }
+
+        if (!xstat.tags) return callback(null, xstat) 
+        
+        // complementary set
+        let newTags = xstat.tags.reduce((acc, id) => tags.includes(id) ? acc : [...acc, id], [])
+        console.log(newTags)
+        updateFileTags(filePath, xstat.uuid, newTags, callback)
+      }) 
+    }
+    this.addTask(F)
+  }
+
+  SETTAGS() {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+      let filePath = path.join(this.abspath(), props.name)
+      readXstat(filePath, (err, xstat) => {
+        if (err) return callback(err)  
+        if (xstat.type !== 'file') {
+          let err = new Error('not a file')
+          err.code = 'ENOTFILE'
+          return callback(err)
+        }
+        updateFileTags(filePath, xstat.uuid, tags, callback)
+      })
+    }
+    this.addTask(F)
+  }
+
+  DIRFORMAT() {
+    const F = (done) => {
+      const callback = (...args) => (cb(...args), done())
+    }
+    this.addTask(F)
+  }
+
 }
 
 Directory.prototype.Init = Init
