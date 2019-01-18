@@ -50,12 +50,12 @@ class Task {
   }
 
   LIST (user, props, callback) {
-    callback(null, this.tasks.map(item => item.view()))
+    callback(null, this.tasks.filter(t => t.user.uuid === user.uuid).map(item => item.view()))
   }
 
   GET (user, props, callback) {
     let result = this.tasks.find(item => item.uuid == props.taskUUID)
-    if (!result) {
+    if (!result || result.user.uuid !== user.uuid) {
       let err = new Error('task not found')
       err.status = 404
       callback(err) 
