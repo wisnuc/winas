@@ -364,6 +364,7 @@ class Directory extends Node {
     // queue run function
     // function(done())
     this.taskQueue = []
+    this.workingQueue = []
   }
 
   /**
@@ -589,16 +590,46 @@ class Directory extends Node {
     return this.taskQueue.shift()
   }
 
+  reqSchedTask () {
+    if (this.taskScheduled) return
+    this.taskScheduled = true
+    process.nextTick(() => this.scheduleTask())
+  }
+
+  scheduleTask() {
+    this.dirReadScheduled = false
+    if (this.taskQueue.length === 0 && this.workingQueue.length === 0) {
+      return
+    }
+
+    while (this.taskQueue.length > 0 && this.workingQueue.length === 0) {
+      let task = this.taskQueue.shift()
+      this.workingQueue.push(task)
+      task(() => {
+        this.workingQueue = []
+        this.reqSchedTask()
+      })
+    }
+  }
+
   MKDIR({ name, policy, read }, cb) {
     const F = (done) => {
       const callback = (...args) => (cb(...args), done())
+      F.canceled = false
+      F.cancel = (cbf) => {
+        F.canceled = true
+        process.nextTick(() => cbf())
+      }
       const target = path.join(this.abspath(), name)
+      if (F.canceled) return
       mkdir(target, policy, (err, xstat, resolved) => {
+        if (F.canceled) return
         if (err) return callback(err)
         // this only happens when skip diff policy taking effect
         if (!xstat) return callback(null, null, resolved)
         if (!read) return callback(null, xstat, resolved)
         this.read((err, xstats) => {
+          if (F.canceled) return
           if (err) return callback(err)
           let found = xstats.find(x => x.uuid === xstat.uuid)
           if (!found) {
@@ -612,31 +643,42 @@ class Directory extends Node {
         })
       })
     }
+    F.rawCallback = cb
     this.addTask(F)
   }
 
   RENAME(props, cb) {
     const F = (done) => {
       const callback = (...args) => (cb(...args), done())
+      F.canceled = false
+      F.cancel = (cbf) => {
+        F.canceled = true
+        process.nextTick(() => cbf())
+      }
       let { fromName, toName, policy } = props
       policy = policy || [null, null]
       
       let src = path.join(this.abspath(), fromName) 
       let dst = path.join(this.abspath(), toName)
       readXstat(src, (err, srcXstat) => {
+        if (F.canceled) return
         if (err) return callback(err)
         if (srcXstat.type === 'directory') {
           mvdir(src, dst, policy, (err, xstat, resolved) => {
+            if (F.canceled) return
             if (err) return callback(err)
             this.read((err, xstats) => {
+              if (F.canceled) return
               if (err) return callback(err)
               return callback(null, xstat, resolved) 
             })
           })
         } else {
           mvfile(src, dst, policy, (err, xstat, resolved) => {
+            if (F.canceled) return
             if (err) return callback(err)
             this.read((err, xstats) => {
+              if (F.canceled) return
               if (err) return callback(err)
               return callback(null, xstat, resolved) 
             })
@@ -644,6 +686,7 @@ class Directory extends Node {
         }
       })
     }
+    F.rawCallback = cb
     this.addTask(F)
   }
 
@@ -654,6 +697,7 @@ class Directory extends Node {
       let target = path.join(this.abspath(), name)
       rimraf(target, err => callback(err))
     }
+    F.rawCallback = cb
     this.addTask(F)
   }
 
@@ -664,6 +708,7 @@ class Directory extends Node {
       let target = path.join(this.abspath(), props.name)
       mkfile(target, props.data, props.sha256 || null, props.policy, callback)
     }
+    F.rawCallback = cb
     this.addTask(F)
   }
 
@@ -742,6 +787,7 @@ class Directory extends Node {
         })
       })
     }
+    F.rawCallback = cb
     this.addTask(F)
   }
 
