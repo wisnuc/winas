@@ -38,15 +38,15 @@ let args = (getArgs(process.argv)).options
 
 // console.log(args)
 
-// only standalone && fruitmix-only mode allows non-priviledged user
+// only standalone && fruitmix-only mode allows non-privileged user
 if (!(args.standalone && args['fruitmix-only']) && !isRoot)
-  throw new Error('boot module requires root priviledge')
+  throw new Error('boot module requires root privilege')
 
-if (args.smb && !isRoot) throw new Error('smb feature requires root priviledge')
-if (args.dlna && !isRoot) throw new Error('dlna feature requires root priviledge')
-if (args.transmission && !isRoot) throw new Error('transmission feature requires root priviledge')
+if (args.smb && !isRoot) throw new Error('smb feature requires root privilege')
+if (args.dlna && !isRoot) throw new Error('dlna feature requires root privilege')
+if (args.transmission && !isRoot) throw new Error('transmission feature requires root privilege')
 
-if (args.mdns && !isRoot) throw new Error('mdns requires root priviledge')
+if (args.mdns && !isRoot) throw new Error('mdns requires root privilege')
 
 let fruitmixOpts = {
   useSmb: !!args.smb,

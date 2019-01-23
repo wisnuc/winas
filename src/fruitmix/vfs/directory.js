@@ -618,10 +618,10 @@ class Directory extends Node {
       F.canceled = false
       F.cancel = (cbf) => {
         F.canceled = true
+        done()
         process.nextTick(() => cbf())
       }
       const target = path.join(this.abspath(), name)
-      if (F.canceled) return
       mkdir(target, policy, (err, xstat, resolved) => {
         if (F.canceled) return
         if (err) return callback(err)
@@ -653,12 +653,13 @@ class Directory extends Node {
       F.canceled = false
       F.cancel = (cbf) => {
         F.canceled = true
+        done()
         process.nextTick(() => cbf())
       }
       let { fromName, toName, policy } = props
       policy = policy || [null, null]
       
-      let src = path.join(this.abspath(), fromName) 
+      let src = path.join(this.abspath(), fromName)
       let dst = path.join(this.abspath(), toName)
       readXstat(src, (err, srcXstat) => {
         if (F.canceled) return
@@ -670,7 +671,7 @@ class Directory extends Node {
             this.read((err, xstats) => {
               if (F.canceled) return
               if (err) return callback(err)
-              return callback(null, xstat, resolved) 
+              return callback(null, xstat, resolved)
             })
           })
         } else {
@@ -680,7 +681,7 @@ class Directory extends Node {
             this.read((err, xstats) => {
               if (F.canceled) return
               if (err) return callback(err)
-              return callback(null, xstat, resolved) 
+              return callback(null, xstat, resolved)
             })
           })
         }
@@ -693,9 +694,18 @@ class Directory extends Node {
   REMOVE(props, cb) {
     const F = (done) => {
       const callback = (...args) => (cb(...args), done())
+      F.canceled = false
+      F.cancel = (cbf) => {
+        F.canceled = true
+        done()
+        process.nextTick(() => cbf())
+      }
       let { name } = props 
       let target = path.join(this.abspath(), name)
-      rimraf(target, err => callback(err))
+      rimraf(target, err => {
+        if (F.canceled) return
+        callback(err)
+      })
     }
     F.rawCallback = cb
     this.addTask(F)
@@ -704,9 +714,18 @@ class Directory extends Node {
   NEWFILE(props, cb) {
     const F = (done) => {
       const callback = (...args) => (cb(...args), done())
+      F.canceled = false
+      F.cancel = (cbf) => {
+        F.canceled = true
+        done()
+        process.nextTick(() => cbf())
+      }
       if (!props.policy) props.policy = [null, null]
       let target = path.join(this.abspath(), props.name)
-      mkfile(target, props.data, props.sha256 || null, props.policy, callback)
+      mkfile(target, props.data, props.sha256 || null, props.policy, (...args) => {
+        if (F.canceled) return
+        callback(...args)
+      })
     }
     F.rawCallback = cb
     this.addTask(F)
@@ -719,10 +738,16 @@ class Directory extends Node {
   APPEND(props, cb) {
     const F = (done) => {
       const callback = (...args) => (cb(...args), done())
+      F.canceled = false
+      F.cancel = (cbf) => {
+        F.canceled = true
+        done()
+        process.nextTick(() => cbf())
+      }
       let { name, hash, data, size, sha256 } = props
-
       let target = path.join(this.abspath(), name)  
       readXstat(target, (err, xstat) => {
+        if (F.canceled) return
         if (err) {
           if (err.code === 'ENOENT' || err.code === 'EISDIR' || err.xcode === 'EUNSUPPORTED') err.status = 403
           return callback(err)
@@ -754,8 +779,10 @@ class Directory extends Node {
         // concat target and data to a tmp file
         // TODO sync before op
         btrfsConcat(tmp, [target, data], err => {
+          if (F.canceled) return
           if (err) return callback(err)
           fs.lstat(target, (err, stat) => {
+            if (F.canceled) return
             if (err) return callback(err)
             if (stat.mtime.getTime() !== xstat.mtime) {
               let err = new Error('race detected')
@@ -778,6 +805,7 @@ class Directory extends Node {
               uuid: xstat.uuid, 
               hash: xstat.size === 0 ? sha256 : combineHash(hash, sha256)
             }, (err, xstat2) => {
+              if (F.canceled) return
               if (err) return callback(err)
               // TODO dirty
               xstat2.name = name
