@@ -372,6 +372,10 @@ class Directory extends Node {
   */
   destroy (detach) {
     debug('destroying', this.uuid, this.name, !!detach)
+    this.taskQueue.forEach(t => t.rawCallback(new Error('destroyed')))
+    this.taskQueue = []
+    this.workingQueue.forEach(t => (t.cancel(), t.rawCallback(new Error('destroyed'))))
+    this.workingQueue = []
     // why this does not work ???
     // [...this.children].forEach(child => child.destroy())
     Array.from(this.children).forEach(c => c.destroy())
