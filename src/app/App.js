@@ -46,6 +46,12 @@ The combination is configurable.
 
 // for test mode
 if (!global.GLOBAL_CONFIG) global.GLOBAL_CONFIG = Config
+if (!global.IS_WISNUC) {
+  global.IS_WISNUC = (type) => type === 'winas' || type === 'ws215i'
+  global.IS_WINAS = type => type === 'winas'
+  global.IS_215I = type => type === 'ws215i'
+  global.IS_N2 = type => type === 'n2'
+}
 
 /**
 App is the top-level container for the application.

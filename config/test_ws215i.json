@@ -1,0 +1,18 @@
+{
+  "type": "ws215i",
+  "storage": {
+    "root": {},
+    "files": {
+      "sn": "/mnt/persistent/certificate/deviceSN"
+    }
+  },
+  "user": {
+
+  },
+  "drive": {
+
+  },
+  "pipe": {
+    "baseURL": "https://abel.nodetribe.com"
+  }
+}
