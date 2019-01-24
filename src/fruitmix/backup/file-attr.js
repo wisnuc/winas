@@ -450,10 +450,11 @@ const readWhiteout = (dirPath, callback) => {
 
 const write = (data, target, hardLink, mtime, callback) => {
   let tmpFile = path.join(global.TMPDIR(), UUID.v4())
+  let cb = (...args) => (rimraf(tmpFile, () => {}), callback(...args))
   fs.writeFile(tmpFile, JSON.stringify(data, null, '  '), err => err
-    ? callback(err)
-    : hardLink ? fs.link(tmpFile, target, callback) 
-      : fs.rename(tmpFile, target, callback))
+    ? cb(err)
+    : hardLink ? fs.link(tmpFile, target, cb) 
+      : fs.rename(tmpFile, target, cb))
 }
 
 module.exports = {

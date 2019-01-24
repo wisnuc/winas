@@ -531,7 +531,10 @@ class VFS extends EventEmitter {
       if (err) return callback(err)
       if (!props.policy) props.policy = [null, null]
       let target = path.join(this.absolutePath(dir), props.name)
-      mkfile(target, props.data, props.sha256 || null, props.policy, callback)
+      mkfile(target, props.data, props.sha256 || null, props.policy, (...args) => {
+        rimraf(props.data, () => {})
+        callback(...args)
+      })
     }) 
   }
 

@@ -374,7 +374,7 @@ class Directory extends Node {
     debug('destroying', this.uuid, this.name, !!detach)
     this.taskQueue.forEach(t => t.rawCallback(new Error('destroyed')))
     this.taskQueue = []
-    this.workingQueue.forEach(t => (t.cancel(), t.rawCallback(new Error('destroyed'))))
+    this.workingQueue.forEach(t => (t.cancel(() => {}), t.rawCallback(new Error('destroyed'))))
     this.workingQueue = []
     // why this does not work ???
     // [...this.children].forEach(child => child.destroy())
@@ -728,6 +728,7 @@ class Directory extends Node {
       let target = path.join(this.abspath(), props.name)
       mkfile(target, props.data, props.sha256 || null, props.policy, (...args) => {
         if (F.canceled) return
+        rimraf(props.data, () => {})
         callback(...args)
       })
     }
