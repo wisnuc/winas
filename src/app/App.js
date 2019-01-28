@@ -15,7 +15,6 @@ const routing = require('./routing')
 const Pipe = require('./Pipe')
 const Transform = require('./Transform')
 const Device = require('../fruitmix/Device')
-const SlotConfPath = '/phi/slots'
 /**
 Create An Application
 
@@ -46,11 +45,12 @@ The combination is configurable.
 
 // for test mode
 if (!global.GLOBAL_CONFIG) global.GLOBAL_CONFIG = Config
-if (!global.IS_WISNUC) {
-  global.IS_WISNUC = (type) => type === 'winas' || type === 'ws215i'
-  global.IS_WINAS = type => type === 'winas'
-  global.IS_215I = type => type === 'ws215i'
-  global.IS_N2 = type => type === 'n2'
+if (!global.hasOwnProperty(IS_WISNUC)) {
+  const type = GLOBAL_CONFIG.type
+  global.IS_WISNUC = type === 'winas' || type === 'ws215i'
+  global.IS_WINAS = type === 'winas'
+  global.IS_215I = type === 'ws215i'
+  global.IS_N2 = type === 'n2'
 }
 
 /**
@@ -81,15 +81,7 @@ class App extends EventEmitter {
       this.deviceSN = fs.readFileSync(Config.storage.files.sn).toString().trim()
     } catch(e) {}
 
-    /**
-     * {
-     *    cloudToken,
-     *    device: {
-     *      deviceSN,
-     *      deviceModel
-     *    }
-     * }
-     */
+    // with cloudToken
     this.cloudConf = {
       auth: () => this.auth
     }
@@ -101,7 +93,8 @@ class App extends EventEmitter {
       let fruitmixOpts = opts.fruitmixOpts
       fruitmixOpts.cloudConf = this.cloudConf
 
-      try { // for phi
+      try { // find slots config
+        const SlotConfPath = configuration.chassis.slots
         let slots
         if (fs.existsSync(SlotConfPath)) {
           slots = JSON.parse(fs.readFileSync(SlotConfPath).toString().trim())
@@ -116,13 +109,6 @@ class App extends EventEmitter {
       this.boot = new Boot({ configuration, fruitmixOpts })
 
       Object.defineProperty(this, 'fruitmix', { get () { return this.boot.fruitmix } })
-
-      if (opts.useAlice) {
-        this.boot.setBoundUser({
-          phicommUserId: 'alice',
-          password: passwordEncrypt('alice', 10)
-        })
-      }
     } else {
       throw new Error('either fruitmix or fruitmixOpts must be provided')
     }
@@ -139,7 +125,7 @@ class App extends EventEmitter {
     }
 
     // create a Pipe
-    this.pipe = GLOBAL_CONFIG.type === 'winas' ? new Transform(pipOpts) : new Pipe(pipOpts)
+    this.pipe = IS_WISNUC ? new Transform(pipOpts) : new Pipe(pipOpts)
 
     // create server if required
     if (opts.useServer) {
@@ -156,8 +142,9 @@ class App extends EventEmitter {
         }
       })
     }
+    // listen message from daemon
     if (opts.listenProcess)
-      process.on('message', GLOBAL_CONFIG.type === 'winas' ?
+      process.on('message', IS_WISNUC ?
         this.handleWinasMessage.bind(this)
         : this.handleMessage.bind(this))
   }
@@ -237,7 +224,11 @@ class App extends EventEmitter {
     bootr.patch('/', (req, res, next) => 
       this.boot.PATCH_BOOT(req.user, req.body, err =>
         err ? next(err) : res.status(200).end()))
-    if (GLOBAL_CONFIG.type === 'phi') {
+    if (IS_WINAS) {
+      bootr.get('/space', (req, res, next) =>
+        this.boot.GET_BoundVolume(req.user, (err, data) =>
+          err ? next(err) : res.status(200).json(data)))
+    } else {
       bootr.get('/boundVolume/space', (req, res, next) =>
         this.boot.GET_BoundVolume(req.user, (err, data) =>
           err ? next(err) : res.status(200).json(data)))
@@ -274,10 +265,6 @@ class App extends EventEmitter {
       bootr.delete('/boundVolume', (req, res, next) =>
         this.boot.uninstall(req.user, req.body, err =>
           err ? next(err) : res.status(200).end()))
-    } else {
-      bootr.get('/space', (req, res, next) =>
-        this.boot.GET_BoundVolume(req.user, (err, data) =>
-          err ? next(err) : res.status(200).json(data)))
     }
 
     routers.push(['/boot', bootr])
@@ -313,38 +300,6 @@ class App extends EventEmitter {
     }
 
     this.express = createExpress(opts)
-  }
-
-  /**
-  Creates api stub for given resource name
-
-  This design does NOT work well if there are too many sub resources. TODO
-
-  @param {string} resource - resource name (singular, such as user, drive, etc)
-  @returns an object with api methods.
-  */
-  stub (resource) {
-    let verbs = ['LIST', 'POST', 'POSTFORM', 'GET', 'PATCH', 'PUT', 'DELETE']
-    return verbs.reduce((stub, verb) =>
-      Object.assign(stub, {
-        [verb]: (user, props, callback) => {
-          if (!this.fruitmix) {
-            let err = new Error('service unavailable')
-            err.status = 503
-            process.nextTick(() => callback(err))
-          } else if (!this.fruitmix.apis[resource]) {
-            let err = new Error('resource not found')
-            err.status = 404
-            process.nextTick(() => callback(err))
-          } else if (!this.fruitmix.apis[resource][verb]) {
-            let err = new Error(`method ${verb} not supported`)
-            err.status = 405
-            process.nextTick(() => callback(err))
-          } else {
-            this.fruitmix.apis[resource][verb](user, props, callback)
-          }
-        }
-      }), {})
   }
 
   /**

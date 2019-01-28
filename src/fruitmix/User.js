@@ -308,12 +308,12 @@ class User extends EventEmitter {
       let pnU = users.find(u => u.phoneNumber === phoneNumber)
       if (pnU && pnU.status !== USER_STATUS.DELETED) throw new Error('phoneNumber already exist')
 
-      if (GLOBAL_CONFIG.type === 'phi') {
+      if (IS_N2) {
         let pU = users.find(u => u.phicommUserId === phicommUserId)
         if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('phicommUserId already exist')
       }
 
-      if (GLOBAL_CONFIG.type === 'winas') {
+      if (IS_WISNUC) {
         let pU = users.find(u => u.winasUserId === winasUserId)
         if (pU && pU.status !== USER_STATUS.DELETED) throw new Error('winasUserId already exist')
       }
@@ -332,7 +332,7 @@ class User extends EventEmitter {
         winasUserId: props.winasUserId // for winas
       }
 
-      if (GLOBAL_CONFIG.type === 'phi') newUser.itime = new Date().getTime() // inviteTime, serve for check invite timeout
+      if (!IS_WISNUC) newUser.itime = new Date().getTime() // inviteTime, serve for check invite timeout
 
       return [...users, newUser]
     }, (err, data) => {
@@ -375,7 +375,6 @@ class User extends EventEmitter {
   }
 
   bindFirstUser (boundUser) {
-    // if (GLOBAL_CONFIG.type !== 'phi') return console.log('bindFirstUser only use for phi')
     this.storeSave(users => {
       let index = users.findIndex(u => u.isFirstUser)
       if (index === -1) {
@@ -391,7 +390,7 @@ class User extends EventEmitter {
         }]
       } else {
         let firstUser = Object.assign({}, users[index])
-        if (GLOBAL_CONFIG.type === 'winas') {
+        if (IS_WISNUC) {
           if (firstUser.winasUserId !== boundUser.id) {
             console.log('===================')
             console.log('This is not an error, but fruitmix received a bound user')
@@ -504,7 +503,7 @@ class User extends EventEmitter {
   POST (user, props, callback) {
     if (!isNonNullObject(props)) return callback(Object.assign(new Error('props must be non-null object'), { status: 400 }))
     let recognized
-    if (GLOBAL_CONFIG.type === 'phi') {
+    if (!IS_WISNUC) {
       recognized = ['username', 'phicommUserId', 'phoneNumber']
     } else {
       // winas not allow
@@ -540,7 +539,7 @@ class User extends EventEmitter {
   Implement PATCH
   */
   PATCH (user, props, callback) {
-    if (GLOBAL_CONFIG.type === 'winas'){
+    if (IS_WISNUC){
       return callback(Object.assign(new Error('not found'), { status: 404 }))
     }
 

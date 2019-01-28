@@ -148,8 +148,8 @@ class Drive extends EventEmitter {
 
   createPublicDrive (props, callback) {
 
-    if (GLOBAL_CONFIG.type === 'winas') {
-      return callback(Object.assign(new Error('There can be only three public drives'), { status: 400 }))
+    if (IS_WISNUC) {
+      return callback(Object.assign(new Error('Operation Denied'), { status: 400 }))
     }
 
     let drive = {

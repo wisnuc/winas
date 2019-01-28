@@ -58,7 +58,7 @@ class State {
 
   continuable () {
     // for winas
-    if (GLOBAL_CONFIG.type === 'winas') return true
+    if (IS_WINAS) return true
 
     if (!this.ctx.boundUser) return false
     if (this.ctx.volumeStore.data === undefined) return false
@@ -68,7 +68,7 @@ class State {
 
   next () {
     // for winas
-    if (GLOBAL_CONFIG.type === 'winas') return this.setState(Starting)
+    if (IS_WINAS) return this.setState(Starting)
 
     if (this.ctx.bootable()) {
       if (this.ctx.preset && this.ctx.preset.state === 'PENDING') {
@@ -217,7 +217,7 @@ class Presetting extends State {
 class Starting extends State {
   enter () {
     let opts, boundVolumeUUID, volume, fruitmixDir
-    if (GLOBAL_CONFIG.type === 'winas') {
+    if (IS_WINAS) {
       if (GLOBAL_CONFIG.storage.root.uuid) {
         boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
         volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
@@ -225,7 +225,7 @@ class Starting extends State {
       } else { // for test
         fruitmixDir = path.join(process.cwd(), GLOBAL_CONFIG.storage.root.path)
       }
-    } else { // for phi
+    } else { // for others
       boundVolumeUUID = this.ctx.volumeStore.data.uuid
       volume = this.ctx.storage.volumes.find(v => v.uuid === boundVolumeUUID)
       fruitmixDir = path.join(volume.mountpoint, this.ctx.conf.storage.fruitmixDir)
@@ -262,7 +262,7 @@ class Started extends State {
     this.udevMonitor = new UdevMonitor()
     this.udevMonitor.on('update', () => this.ctx.storageUpdater.probe())
     
-    if (GLOBAL_CONFIG.type !== 'winas') {
+    if (!IS_WINAS) {
       this.jobs = []
       let job = {
         type: 'updateBoundVolume',
@@ -272,7 +272,7 @@ class Started extends State {
       this.reqSchedJob()
       this.uninstalling = false
 
-      // do balance 
+      // start timer to do balance
       this.balanceTimer = setInterval(() => {
         child.exec(`btrfs balance start ${ fruitmix.fruitmixDir }`, err => {
           if (err) {
@@ -371,62 +371,9 @@ class Started extends State {
       this.ctx.volumeStore.save(newBoundVolume, err =>
         err ? reject(err) : resolve(newBoundVolume))})
   }
-  /*
-    add (devices, mode, callback) {
-      if (this.uninstalling) return callback(new Error('station in uninstalling'))
-      if (!Array.isArray(devices) || devices.length !== 1) {
-        return callback(new Error('devices must be an one item array'))
-      }
-
-      if (mode !== 'single' && mode !== 'raid1') {
-        return callback(new Error('device must be eithor single or raid1'))
-      }
-
-      let job = {
-        type: 'addDevice',
-        props: {
-          devices,
-          mode
-        },
-        callback
-      }
-
-      this.jobs.push(job)
-      this.reqSchedJob()
-    }
-
-    async doAddAsync ({ devices, mode }) {
-
-      let storage = await probeAsync(this.ctx.conf.storage)
-
-      let wantD = devices[0]
-      let volumeUUID = this.ctx.volumeStore.data.uuid
-      let volume = this.ctx.storage.volumes.find(v => v.uuid === volumeUUID)
-      let block = this.ctx.storage.blocks.find(b => b.name === wantD.name)
-
-      if (!block) throw new Error('block not found')
-      if (!volume) throw new Error('volume not found')
-      if (volume.devices.length !== 1) throw new Error('volume has more then one device')
-      if (volume.devices.find(d => d.name === wantD.name)) throw new Error('device has already in volume')
-      await umountBlocksAsync(storage, [ wantD.name ])
-      await child.execAsync(`btrfs device add -f ${ block.devname } ${ volume.mountpoint}`)
-
-      if (mode === 'single') {
-        await child.execAsync(`btrfs balance start -f -mconvert=raid1 ${ volume.mountpoint }`)
-      } else {
-        await child.execAsync(`btrfs balance start -f -dconvert=raid1 -mconvert=raid1 ${ volume.mountpoint }`)
-      }
-
-      storage = await probeAsync(this.ctx.conf.storage)
-
-      this.ctx.storage = storage
-
-      return await this.updateBoundVolumeAsync()
-
-    }
-  */
+  
   remove (devices, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
 
     if (this.uninstalling) return callback(new Error('station in uninstalling'))
     if (!Array.isArray(devices) || devices.length !== 1) {
@@ -466,7 +413,9 @@ class Started extends State {
   }
 
   uninstall(props, cb) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => cb(new Error('Error Operation')))
+    
+    if (IS_WINAS) return process.nextTick(() => cb(new Error('Error Operation')))
+
     let callback = (err) => {
       this.uninstalling = false
       console.log(err)
@@ -709,7 +658,8 @@ class Initializing extends State {
       username: 'admin',
       isFirstUser: true,
       isAdmin: true,
-      phicommUserId: this.ctx.boundUser.phicommUserId,
+      phicommUserId: this.ctx.boundUser.phicommUserId, // for phi
+      winasUserId: this.ctx.boundUser.winasUserId,
       password: this.ctx.boundUser.password,
       status: 'ACTIVE',
       createTime: new Date().getTime(),
@@ -760,7 +710,8 @@ class Importing extends State {
 
       let firstUser = volume.users.find(u => u.isFirstUser === true)
       if (!firstUser) throw new Error('volume admin not found')
-      if (firstUser.phicommUserId !== this.ctx.boundUser.phicommUserId) throw new Error('volume admin <-> boundUser mismatch')
+      if (IS_N2 && firstUser.phicommUserId !== this.ctx.boundUser.phicommUserId) throw new Error('volume admin <-> boundUser mismatch')
+      if (IS_WISNUC && firstUser.winasUserId !== this.ctx.boundUser.winasUserId) throw new Error('volume admin <-> boundUser mismatch')
     } catch (e) {
       return process.nextTick(() => {
         this.setState(Probing)
@@ -991,7 +942,7 @@ class Boot extends EventEmitter {
       }
     })
 
-    if (GLOBAL_CONFIG.type !== 'winas') {
+    if (!IS_WINAS) {
       this.prepareChassisDirs(err => {
         if (err) {
           // will halt boot @ pending state after probing
@@ -1022,7 +973,7 @@ class Boot extends EventEmitter {
   }
 
   storageUpdate (data) {
-    if (this.stateName().toUpperCase() === 'STARTED' && GLOBAL_CONFIG.type !== 'winas') {
+    if (this.stateName().toUpperCase() === 'STARTED' && !IS_WINAS) {
       let prvVol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
       let vol = data.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
       if (vol.isMissing) return process.exit(61)
@@ -1081,25 +1032,28 @@ class Boot extends EventEmitter {
 
     let firstUser = vol.users.find(u => u.isFirstUser === true)
     if (!firstUser) return false // firstUser not found
-    if (firstUser.phicommUserId !== this.boundUser.phicommUserId) return false
-
+    if (IS_N2 && firstUser.phicommUserId !== this.boundUser.phicommUserId) return false
+    if (IS_WISNUC && firstUser.winasUserId !== this.boundUser.winasUserId) return false
     return true
   }
 
   setBoundUser (user) {
-    if (GLOBAL_CONFIG.type === 'phi') {
-      if (user && this.boundUser && this.boundUser.phicommUserId !== user.phicommUserId) {
+    if (IS_N2  || IS_WS215I) {
+      let userKey = IS_N2 ? 'phicommUserId' : 'winasUserId'
+      if (user && this.boundUser && this.boundUser[userKey] !== user[userKey]) {
         console.log('====== boundUser runtime change =====')
         console.log('====== fruitmix exit =====')
         process.exit(61)
       }
       this.boundUser = user
       this.state.boundUserUpdated()
-    }
-    else {
+    } else if (IS_WINAS) {
       this.boundUser = user
       if (this.state.constructor.name !== 'Started') return
       this.fruitmix.bindFirstUser(user)
+    } 
+    else {
+      
     }
   }
 
@@ -1107,7 +1061,7 @@ class Boot extends EventEmitter {
 
     let storage
 
-    if (this.storage && GLOBAL_CONFIG.type === 'phi') {
+    if (this.storage && !IS_WISNUC) {
       let portsPaths= this.storage.ports
         .map(p => p.path.split('/ata_port').length ? p.path.split('/ata_port')[0] : undefined)
         .filter(x => !!x && x.length)
@@ -1124,7 +1078,10 @@ class Boot extends EventEmitter {
 
     return {
       state: this.state.constructor.name.toUpperCase(),
-      boundUser: this.boundUser ? { phicommUserId: this.boundUser.phicommUserId } : this.boundUser,
+      boundUser: this.boundUser ? { 
+        phicommUserId: this.boundUser.phicommUserId,
+        winasUserId: this.boundUser.winasUserId
+      } : this.boundUser,
       boundVolume: this.volumeStore && this.volumeStore.data,
       storage: storage,
       preset: this.preset
@@ -1132,27 +1089,27 @@ class Boot extends EventEmitter {
   }
 
   init (target, mode, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.init(target, mode, callback)
   }
 
   import (volumeUUID, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.import(volumeUUID, callback)
   }
 
   repair (devices, mode, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.repair(devices, mode, callback)
   }
 
   add (devices, mode, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.add(devices, mode, callback)
   }
 
   remove (devices, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     this.state.remove(devices, callback)
   }
 
@@ -1166,12 +1123,8 @@ class Boot extends EventEmitter {
    * @param {*} callback 
    */
   uninstall (user, props,callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
-    // FIXME:
-    // if (!user || !user.phicommUserId || user.phicommUserId !== this.boundUser.phicommUserId) {
-    //   return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
-    // }
-    
+    if (IS_WISNUC) return process.nextTick(() => callback(new Error('Error Operation')))
+
     if (props.reset && typeof props.reset !== 'boolean') {
       return callback(Object.assign(new Error('props error'), { status: 400 }))
     }
@@ -1195,48 +1148,14 @@ class Boot extends EventEmitter {
       callback(new Error('no operation'))
   }
 
+  // TODO: wait define
   resetToFactory(user, autoReboot, callback) {
-    if (GLOBAL_CONFIG.type === 'winas') return process.nextTick(() => callback(new Error('Error Operation')))
+    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
+    else if (IS_WS215I) {
 
-    let fileP = '/mnt/reserved/fw_ver_release.json'
-    fs.readFile(fileP, (err, data) => {
-      if (err) return callback(err)
-      let config
-      try { 
-        config = JSON.parse(data.toString())
-      } catch(e) {
-        return callback(e)
-      }
-      config.action = '1'
-      let tmpP = path.join(this.conf.chassis.tmpDir, UUID.v4())
-      // let command = 'chattr -i /mnt/reserved/fw_ver_release.json'
-      // command = command + `cat ${ tmpP } | jq . > /mnt/reserved/fw_ver_release.json;\n`
-      // command = command + 'rm /tmp/release.json;\n'
-      // command = command + 'chattr +i /mnt/reserved/fw_ver_release.json;\n'
-      // command = command + 'sleep 5; reboot'
-      // child.exec(command)
-      fs.writeFile(tmpP, JSON.stringify(config, null, '  '), err => {
-        if (err) return callback(err)
-        child.exec('chattr -i /mnt/reserved/fw_ver_release.json', err => {
-          if (err) return callback(err)
-          fs.rename(tmpP, fileP, err => {
-            child.exec('chattr +i /mnt/reserved/fw_ver_release.json')
-            if (err) return callback(err)
-            console.log('do auto reboot: ', autoReboot)
-            let volumeDir = path.join(this.conf.chassis.dir)
-            if (autoReboot) {
-              rimraf(volumeDir, err => {
-                if (err) console.log('clean 2th partition failed: ', err)
-                if (autoReboot) setTimeout(() => child.exec('reboot'), 100)
-                callback(null)
-              })
-            } else {
-              callback(null)
-            }
-          })
-        })
-      })
-    })
+    } else {
+      return process.nextTick(() => callback(new Error('Error Operation')))
+    }
   }
 
   async ejectUSBAsync (target) {
@@ -1291,13 +1210,8 @@ class Boot extends EventEmitter {
 
   PATCH_BOOT (user, props, callback) {
     if (props.hasOwnProperty('state')) {
-      if (props.state !== 'poweroff' && props.state !== 'reboot') return callback(Object.assign(new Error('invalid state'), { status: 400 }))
-      if (props.state === 'poweroff') {
-        child.exec('service ledlogic stop', () => {})
-        child.exec('ecioctl -s led red off', () => {})
-        child.exec('ecioctl -s led blue off', () => {})
-        child.exec('ecioctl -s led yellow blink 1', () => {})
-      }
+      if (props.state !== 'poweroff' && props.state !== 'reboot')
+        return callback(Object.assign(new Error('invalid state'), { status: 400 }))
       setTimeout(() => child.exec(props.state), 2000)
       callback(null)
     } else return callback(Object.assign(new Error('invalid props'), { status: 400 }))
@@ -1305,7 +1219,7 @@ class Boot extends EventEmitter {
 
   GET_BoundVolume (user, callback) {
     let vol
-    if (GLOBAL_CONFIG.type === 'winas') {
+    if (IS_WINAS) {
       if (GLOBAL_CONFIG.storage.root.uuid) {
         let boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
         vol = this.storage.volumes.find(v => v.fileSystemUUID === boundVolumeUUID)
