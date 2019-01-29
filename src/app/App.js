@@ -45,11 +45,11 @@ The combination is configurable.
 
 // for test mode
 if (!global.GLOBAL_CONFIG) global.GLOBAL_CONFIG = Config
-if (!global.hasOwnProperty(IS_WISNUC)) {
+if (!global.hasOwnProperty('IS_WISNUC')) {
   const type = GLOBAL_CONFIG.type
   global.IS_WISNUC = type === 'winas' || type === 'ws215i'
   global.IS_WINAS = type === 'winas'
-  global.IS_215I = type === 'ws215i'
+  global.IS_WS215I = type === 'ws215i'
   global.IS_N2 = type === 'n2'
 }
 

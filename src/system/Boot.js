@@ -655,16 +655,16 @@ class Initializing extends State {
 
     let users = [{
       uuid: UUID.v4(),
-      username: 'admin',
+      username: this.ctx.boundUser.username,
       isFirstUser: true,
       isAdmin: true,
       phicommUserId: this.ctx.boundUser.phicommUserId, // for phi
-      winasUserId: this.ctx.boundUser.winasUserId,
+      winasUserId: this.ctx.boundUser.id,
       password: this.ctx.boundUser.password,
       status: 'ACTIVE',
       createTime: new Date().getTime(),
       lastChangeTime: new Date().getTime(),
-      phoneNumber: this.ctx.boundUser.phoneNumber
+      phoneNumber: this.ctx.boundUser.username
     }]
 
     await mkdirpAsync(tmpDir)
