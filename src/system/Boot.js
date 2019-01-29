@@ -303,6 +303,14 @@ class Started extends State {
     clearInterval(this.balanceTimer)
   }
 
+  add (devices, mode, callback) {
+    if (this.uninstalling)
+      return process.nextTick(() => callback(new Error('uninstalling')))
+    if (this.jobs.length)
+      return process.nextTick(() => callback(new Error('target busy')))
+    this.setState(Adding, devices, mode, callback)
+  }
+
   boundUserUpdated () {
     // FIXME
   }
@@ -1027,19 +1035,19 @@ class Boot extends EventEmitter {
     if (!Array.isArray(vol.users)) return false // users.json not ready
 
     // if add or remove device, jump to unavailiable state
-    let slotBlocks = this.view().storage.blocks.filter(b => b.slotNumber)
-    if (slotBlocks.length !== this.volumeStore.data.devices.length) return false 
+    // let slotBlocks = this.view().storage.blocks.filter(b => b.slotNumber)
+    // if (slotBlocks.length !== this.volumeStore.data.devices.length) return false 
 
     let firstUser = vol.users.find(u => u.isFirstUser === true)
     if (!firstUser) return false // firstUser not found
     if (IS_N2 && firstUser.phicommUserId !== this.boundUser.phicommUserId) return false
-    if (IS_WISNUC && firstUser.winasUserId !== this.boundUser.winasUserId) return false
+    if (IS_WISNUC && firstUser.winasUserId !== this.boundUser.id) return false
     return true
   }
 
   setBoundUser (user) {
     if (IS_N2  || IS_WS215I) {
-      let userKey = IS_N2 ? 'phicommUserId' : 'winasUserId'
+      let userKey = IS_N2 ? 'phicommUserId' : 'id'
       if (user && this.boundUser && this.boundUser[userKey] !== user[userKey]) {
         console.log('====== boundUser runtime change =====')
         console.log('====== fruitmix exit =====')
@@ -1080,7 +1088,7 @@ class Boot extends EventEmitter {
       state: this.state.constructor.name.toUpperCase(),
       boundUser: this.boundUser ? { 
         phicommUserId: this.boundUser.phicommUserId,
-        winasUserId: this.boundUser.winasUserId
+        winasUserId: this.boundUser.id
       } : this.boundUser,
       boundVolume: this.volumeStore && this.volumeStore.data,
       storage: storage,
