@@ -1034,6 +1034,7 @@ class Boot extends EventEmitter {
     if (vol.missing) return false // bound volume has missing device
     if (!Array.isArray(vol.users)) return false // users.json not ready
 
+    // TODO: not required, need a config
     // if add or remove device, jump to unavailiable state
     // let slotBlocks = this.view().storage.blocks.filter(b => b.slotNumber)
     // if (slotBlocks.length !== this.volumeStore.data.devices.length) return false 
@@ -1061,7 +1062,9 @@ class Boot extends EventEmitter {
       this.fruitmix.bindFirstUser(user)
     } 
     else {
-      
+      console.log('====== unknown device type =====')
+      console.log('====== exit =====')
+      process.exit(61)
     }
   }
 
@@ -1270,7 +1273,6 @@ class Boot extends EventEmitter {
       }
     })
   }
-
 }
 
 module.exports = Boot
