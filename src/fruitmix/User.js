@@ -13,12 +13,6 @@ const USER_STATUS = {
   DELETED: 'DELETED'
 }
 
-const INACTIVE_REASON = {
-  IMPORT: 'import',
-  TIMEOUT: 'timeout',
-  REJECT: 'reject'
-}
-
 // while cloud users update , change to reading state
 class Base {
   constructor (user, ...args) {
@@ -369,7 +363,7 @@ class User extends EventEmitter {
   }
 
   updatePassword (userUUID, props, callback) {
-    if (GLOBAL_CONFIG.type === 'winas '){
+    if (IS_WISNUC){
       return callback(Object.assign(new Error('not found'), { status: 404 }))
     }
   }
@@ -529,7 +523,8 @@ class User extends EventEmitter {
   */
   GET (user, props, callback) {
     let userUUID = props.userUUID
-    let u = isUUID(userUUID) ? this.getUser(props.userUUID) : this.users.find(u => u.phicommUserId && u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
+    let u = isUUID(userUUID) ? this.getUser(props.userUUID)
+      : this.users.find(u => u.phicommUserId && u.phicommUserId === props.userUUID && u.status !== USER_STATUS.DELETED)
     if (!u) return process.nextTick(() => callback(Object.assign(new Error('user not found'), { status: 404 })))
     if (user.isFirstUser || user.uuid === u.uuid) return process.nextTick(() => callback(null, this.fullInfo(u)))
     return process.nextTick(Object.assign(new Error('Permission Denied'), { status: 403 }))

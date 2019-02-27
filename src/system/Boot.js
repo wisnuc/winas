@@ -1159,7 +1159,7 @@ class Boot extends EventEmitter {
       callback(new Error('no operation'))
   }
 
-  // TODO: wait define
+  // TODO: wait definition
   resetToFactory(user, autoReboot, callback) {
     if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
     else if (IS_WS215I) {
