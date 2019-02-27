@@ -24,7 +24,6 @@ CreateApp parses args and create the App accordingly.
   --mdns                      fake mdns broadcasting
   --fruitmix-only             start fruitmix without boot
   --fruitmix-dir path/to/dir  use the given path as fruitmix root directory.
-  --alice                     use alice as bound user
 --smb                         use smb
 --dlna                        use dlna
 --transmission                use transmission
@@ -67,21 +66,14 @@ if (args.standalone) {
       fruitmixOpts.fruitmixDir = tmptest
     }
 
-    if (!!args['alice']) {
-      fruitmixOpts.boundUser = {
-        phicommUserId: 'alice',
-        password: passwordEncrypt('alice', 10)
-      }
-    }
-
     let fruitmix = new Fruitmix(fruitmixOpts)
     let app = new App({
       fruitmix,
       useServer: true,
     })
   } else {
-    let configuration = configurations.wisnuc.winas
-    // console.log('configuration', configuration)
+    let configuration = process.env.DEVIVE_TYPE === 'winas' ? configurations.wisnuc.winas
+        : configurations.wisnuc.default
     fruitmixOpts.useSmb = !!args.smb || configuration.smbAutoStart
     fruitmixOpts.useDlna = !!args.dlna || configuration.dlnaAutoStart
     let app = new App({
@@ -93,9 +85,3 @@ if (args.standalone) {
     })
   }
 }
-
-// print freemem per 60s
-// setInterval(() => console.log('process info:', Object.assign({
-//   uptime: process.uptime(),
-//   freemem: os.freemem()
-// }, process.memoryUsage())), 60 * 1000)

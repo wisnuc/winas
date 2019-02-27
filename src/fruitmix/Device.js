@@ -61,7 +61,9 @@ const probeProcAsync = async (path, multi) => {
 }
 
 const deviceModel = () => {
-  return 'winas'
+  return IS_WINAS ? 'winas' :
+            IS_WS215I ? 'ws215i'
+            : 'unknown'
 }
 
 const softwareVersion = () => {

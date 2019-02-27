@@ -25,23 +25,25 @@ configuration for wisnuc devices
 */
 const wisnuc = {
   chassis: {
-    userBinding: false,
+    userBinding: true,
     volumeBinding: true,
     dir: '/etc/wisnuc',
-    tmpDir: '/etc/phicomm/atmp'
+    tmpDir: '/etc/wisnuc/atmp',
+    dTmpDir: '/etc/wisnuc/dtmp',
+    slots: '/etc/wisnuc/slots'
   },
   storage: {
     fruitmixDir: 'wisnuc/fruitmix',
     volumeDir: '/run/wisnuc/volumes',
     nonVolumeDir: '/run/wisnuc/blocks',
-    userProps: ['uuid', 'username', 'isFirstUser', 'global' ]
+    userProps: ['uuid', 'username', 'isFirstUser', 'winasUserId' ]
   },
   tag: {
     isPrivate: false,
     visibleInPublicDrive: true,
   },
-  smbAutoStart: true,
-  dlnaAutoStart: true
+  smbAutoStart: false,
+  dlnaAutoStart: false
 }
 
 /** 
@@ -54,13 +56,14 @@ const winas = {
     volumeBinding: true,
     dir: '/etc/winas',
     tmpDir: '/etc/winas/atmp',
-    dTmpDir: '/etc/winas/atmp'
+    dTmpDir: '/etc/winas/dtmp',
+    slots: '/etc/winas/slots'
   },
   storage: {
     fruitmixDir: 'winas/fruitmix',
     volumeDir: '/run/winas/volumes',
     nonVolumeDir: '/run/winas/blocks',
-    userProps: ['uuid', 'username', 'isFirstUser', 'global' ]
+    userProps: ['uuid', 'username', 'isFirstUser', 'winasUserId' ]
   },
   tag: {
     isPrivate: false,
@@ -80,7 +83,8 @@ const n2 = {
     volumeBinding: true,
     dir: '/mnt/reserved/userdata/phicomm',
     tmpDir: '/mnt/reserved/userdata/phicomm/atmp',
-    dTmpDir: '/mnt/reserved/userdata/phicomm/dtmp'
+    dTmpDir: '/mnt/reserved/userdata/phicomm/dtmp',
+    slots: '/phi/slots'
   },
   storage: {
     fruitmixDir: 'phicomm/n2',
