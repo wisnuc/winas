@@ -461,7 +461,7 @@ const updateFileHash = (target, uuid, hash, time, callback) => {
   try {
     if (!isUUID(uuid)) throw new Error('invalid uuid')
     if (!isSHA256(hash)) throw new Error('invalid hash')
-    if (Number.isInteger(time)) throw new Error('invalid time')
+    if (!Number.isInteger(time)) throw new Error('invalid time')
   } catch (err) {
     err.code = 'EINVAL'
     return process.nextTick(() => callback(err))
