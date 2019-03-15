@@ -72,7 +72,7 @@ if (args.standalone) {
       useServer: true,
     })
   } else {
-    let configuration = process.env.DEVIVE_TYPE === 'winas' ? configurations.wisnuc.winas
+    let configuration = process.env.DEVICE_TYPE === 'winas' ? configurations.wisnuc.winas
         : configurations.wisnuc.default
     fruitmixOpts.useSmb = !!args.smb || configuration.smbAutoStart
     fruitmixOpts.useDlna = !!args.dlna || configuration.dlnaAutoStart
