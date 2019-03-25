@@ -45,6 +45,7 @@ class State {
   }
 
   exit () {
+    console.log('=== Boot exited ===', this.constructor.name)
   }
 
   boundUserUpdated () {
@@ -52,6 +53,8 @@ class State {
 
   boundVolumeUpdated () {
   }
+
+  storageUpdate() {}
 
   presetLoaded () {
   }
@@ -67,8 +70,8 @@ class State {
   }
 
   next () {
-    // for winas
-    if (IS_WINAS) return this.setState(Starting)
+    // for embed volume
+    if (IS_WINAS) return this.setState(EmbedVolumeCheck)
 
     if (this.ctx.bootable()) {
       if (this.ctx.preset && this.ctx.preset.state === 'PENDING') {
@@ -214,17 +217,33 @@ class Presetting extends State {
   }
 }
 
+class EmbedVolumeCheck extends State {
+  enter() {
+    let volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing)
+    if (!volume) {
+      return process.nextTick(() => this.setState(EmbedVolumeFailed, new Error('volume not found')))
+    }
+    return process.nextTick(() => this.setState(Starting, volume))
+  }
+}
+
+class EmbedVolumeFailed extends State {
+  enter (err) {
+    this.err = err
+    console.log('EmbedVolumeFailed', err)
+  }
+
+  storageUpdate() {
+    this.setState(Probing)
+  }
+}
+
 class Starting extends State {
-  enter () {
+  enter (v) {
     let opts, boundVolumeUUID, volume, fruitmixDir
     if (IS_WINAS) {
-      if (GLOBAL_CONFIG.storage.root.uuid) {
-        boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
-        volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID === boundVolumeUUID)
-        fruitmixDir = path.join(volume.mountpoint, this.ctx.conf.storage.fruitmixDir)
-      } else { // for test
-        fruitmixDir = path.join(process.cwd(), GLOBAL_CONFIG.storage.root.path)
-      }
+      volume = v
+      fruitmixDir = path.join(v.mountpoint, this.ctx.conf.storage.fruitmixDir)
     } else { // for others
       boundVolumeUUID = this.ctx.volumeStore.data.uuid
       volume = this.ctx.storage.volumes.find(v => v.uuid === boundVolumeUUID)
@@ -981,23 +1000,6 @@ class Boot extends EventEmitter {
   }
 
   storageUpdate (data) {
-    if (this.stateName().toUpperCase() === 'STARTED' && !IS_WINAS) {
-      let prvVol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
-      let vol = data.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
-      if (vol.isMissing) return process.exit(61)
-      let prvObj = Object.assign({}, {
-        missing: prvVol.missing, 
-        devices: prvVol.devices
-      })
-      let volObj = Object.assign({}, {
-        missing: vol.missing, 
-        devices: vol.devices
-      })
-      if (!vol || !deepEqual(prvObj, volObj)) {
-        // vol mismatch 
-        process.exit(61)
-      }
-    }
     this.storage = data
   }
 
@@ -1034,11 +1036,6 @@ class Boot extends EventEmitter {
     if (vol.missing) return false // bound volume has missing device
     if (!Array.isArray(vol.users)) return false // users.json not ready
 
-    // TODO: not required, need a config
-    // if add or remove device, jump to unavailiable state
-    // let slotBlocks = this.view().storage.blocks.filter(b => b.slotNumber)
-    // if (slotBlocks.length !== this.volumeStore.data.devices.length) return false 
-
     let firstUser = vol.users.find(u => u.isFirstUser === true)
     if (!firstUser) return false // firstUser not found
     if (IS_N2 && firstUser.phicommUserId !== this.boundUser.phicommUserId) return false
@@ -1047,9 +1044,8 @@ class Boot extends EventEmitter {
   }
 
   setBoundUser (user) {
-    if (IS_N2  || IS_WS215I) {
-      let userKey = IS_N2 ? 'phicommUserId' : 'id'
-      if (user && this.boundUser && this.boundUser[userKey] !== user[userKey]) {
+    if (IS_WS215I) {
+      if (user && this.boundUser && this.boundUser.id !== user.id) {
         console.log('====== boundUser runtime change =====')
         console.log('====== fruitmix exit =====')
         process.exit(61)
@@ -1069,24 +1065,6 @@ class Boot extends EventEmitter {
   }
 
   view () {
-
-    let storage
-
-    if (this.storage && !IS_WISNUC) {
-      let portsPaths= this.storage.ports
-        .map(p => p.path.split('/ata_port').length ? p.path.split('/ata_port')[0] : undefined)
-        .filter(x => !!x && x.length)
-      let slots = this.conf.slots.map(s => {
-        let p = portsPaths.find(p => p.endsWith(s))
-        return !!p ? p : undefined
-      })
-
-      storage = JSON.parse(JSON.stringify(this.storage))
-
-      slots.forEach((value, index) => value ? (storage.blocks.forEach(b => b.path.startsWith(value) ? b.slotNumber = index + 1 : b)) : value)
-    } else
-      storage = this.storage
-
     return {
       state: this.state.constructor.name.toUpperCase(),
       boundUser: this.boundUser ? { 
@@ -1094,7 +1072,7 @@ class Boot extends EventEmitter {
         winasUserId: this.boundUser.id
       } : this.boundUser,
       boundVolume: this.volumeStore && this.volumeStore.data,
-      storage: storage,
+      storage: this.storage,
       preset: this.preset
     }
   }
@@ -1161,8 +1139,7 @@ class Boot extends EventEmitter {
 
   // TODO: wait definition
   resetToFactory(user, autoReboot, callback) {
-    if (IS_WINAS) return process.nextTick(() => callback(new Error('Error Operation')))
-    else if (IS_WS215I) {
+    if (IS_WS215I) {
 
     } else {
       return process.nextTick(() => callback(new Error('Error Operation')))

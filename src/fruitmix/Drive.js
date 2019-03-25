@@ -168,7 +168,8 @@ class Drive extends EventEmitter {
     // TODO create directory
 
     this.storeSave(drives => {
-      if (drives.filter(d => d.privacy === false && !d.isDeleted).length >= 3) throw Object.assign(new Error('There can be only three public drives'), { status: 400 })
+      if (drives.filter(d => d.privacy === false && !d.isDeleted).length >= 3)
+        throw Object.assign(new Error('There can be only three public drives'), { status: 400 })
       if (props.label && !drives.filter(d => !d.isDeleted).every(d => d.label !== props.label)) {
         throw Object.assign(new Error('label has already been used'), { status: 400 })
       }
@@ -301,7 +302,8 @@ class Drive extends EventEmitter {
    * @param {function} callback
    */
   GET (user, props, callback) {
-    if (!this.userCanReadDrive(user.uuid, props.driveUUID)) return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
+    if (!this.userCanReadDrive(user.uuid, props.driveUUID))
+      return process.nextTick(() => callback(Object.assign(new Error('Permission Denied'), { status: 403 })))
     let drv = this.getDrive(props.driveUUID)
     if (!drv || drv.isDeleted) return process.nextTick(() => callback(Object.assign(new Error('drive not found'), { status: 403 })))
     process.nextTick(() => callback(null, drv))
