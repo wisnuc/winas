@@ -219,7 +219,7 @@ class Presetting extends State {
 
 class EmbedVolumeCheck extends State {
   enter() {
-    let volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing)
+    let volume = this.ctx.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing && v.isBtrfs)
     if (!volume) {
       return process.nextTick(() => this.setState(EmbedVolumeFailed, new Error('volume not found')))
     }
@@ -1208,11 +1208,9 @@ class Boot extends EventEmitter {
   GET_BoundVolume (user, callback) {
     let vol
     if (IS_WINAS) {
-      if (GLOBAL_CONFIG.storage.root.uuid) {
-        let boundVolumeUUID = GLOBAL_CONFIG.storage.root.uuid
-        vol = this.storage.volumes.find(v => v.fileSystemUUID === boundVolumeUUID)
-      } else {
-        return callback(new Error('fake device'))
+      vol = this.ctx.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing && v.isBtrfs)
+      if (!vol) {
+        return callback(new Error('embed volume not found'))
       }
     } else {
       if (!this.volumeStore.data) return callback(new Error('no bound volume')) // no bound volume
