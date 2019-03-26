@@ -1209,7 +1209,7 @@ class Boot extends EventEmitter {
     if (!this.storage) return
     let block = this.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && v.isBtrfs)
     if (!block) return
-    return this.storage.volumes.find(v => v.fileSystemUUID !== block.fileSystemUUID && v.isMounted && !v.isMissing)
+    return this.storage.volumes.find(v => v.fileSystemUUID === block.fileSystemUUID && v.isMounted && !v.isMissing)
   }
 
   GET_BoundVolume (user, callback) {
