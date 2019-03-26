@@ -1205,13 +1205,18 @@ class Boot extends EventEmitter {
     } else return callback(Object.assign(new Error('invalid props'), { status: 400 }))
   }
 
+  findEmbedVolume() {
+    if (!this.storage) return
+    let block = this.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && v.isBtrfs)
+    if (!block) return
+    return this.storage.volumes.find(v => v.fileSystemUUID !== block.fileSystemUUID && v.isMounted && !v.isMissing)
+  }
+
   GET_BoundVolume (user, callback) {
     let vol
     if (IS_WINAS) {
-      vol = this.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing && v.isBtrfs)
-      if (!vol) {
-        return callback(new Error('embed volume not found'))
-      }
+      vol = this.findEmbedVolume()
+      if (!vol) return callback(new Error('embed volume not found'))
     } else {
       if (!this.volumeStore.data) return callback(new Error('no bound volume')) // no bound volume
       vol = this.storage.volumes.find(v => v.uuid === this.volumeStore.data.uuid)
