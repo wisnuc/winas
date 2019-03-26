@@ -1208,7 +1208,7 @@ class Boot extends EventEmitter {
   GET_BoundVolume (user, callback) {
     let vol
     if (IS_WINAS) {
-      vol = this.ctx.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing && v.isBtrfs)
+      vol = this.storage.blocks.find(v => v.fileSystemUUID !== '0cbc36fa-3b85-40af-946e-f15dce29d86b' && v.isUSB && !v.isMissing && v.isBtrfs)
       if (!vol) {
         return callback(new Error('embed volume not found'))
       }
