@@ -33,12 +33,18 @@ class Stats {
         document.count++
         document.totalSize += file.size
       } else {
-        others.count++
+        // others.count++
       }
     }
     let totalSize = 0
-    Array.from(this.vfs.forest.roots.values()).forEach(x => totalSize += x.stats().fileTotalSize || 0)
+    let totalCount = 0
+    Array.from(this.vfs.forest.roots.values()).forEach(x => {
+      let stats = x.stats()
+      totalSize += stats.fileTotalSize || 0
+      totalCount += stats.fileCount || 0
+    })
     others.totalSize = totalSize - image.totalSize - video.totalSize - audio.totalSize - document.totalSize
+    others.count = totalCount - image.count - video.count - audio.count - document.count // fix others count
     others.totalSize = others.totalSize > 0 ? others.totalSize : 0
     process.nextTick(() => callback(null, { image, video, audio, document, others }))
   }
