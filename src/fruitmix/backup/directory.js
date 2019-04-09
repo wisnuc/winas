@@ -89,6 +89,7 @@ class Reading extends Directory.prototype.Reading {
     // remove non-interested files
     // xstats = xstats.filter(x => x.type === 'directory' || (x.type === 'file' && (typeof x.magic === 'string' || (Array.isArray(x.tags) && x.tags.length !== 0))))
     xstats = xstats.filter(x => x.type === 'directory' || (x.type === 'file' && (x.metadata || x.tags)))
+                .map(x => x.archived = x.archived || this.dir.archived) // transmit archived status
 
     // convert to a map
     let map = new Map(xstats.map(x => [x.uuid, x]))

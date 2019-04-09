@@ -1126,7 +1126,7 @@ class VFS extends EventEmitter {
     places = props.places.split('.')
     if (!places.every(place => isUUID(place))) return EInval('invalid places') 
     if (places.length !== Array.from(new Set(places)).length) return EInval('places has duplicate elements')
-
+    // check permission
     for (let i = 0; i < places; i++) {
       let place = places[i]
 
@@ -1239,7 +1239,7 @@ class VFS extends EventEmitter {
       let args = { order, lastIndex, lastType, lastPath, count, places, types, tags, name }
 
       let range = { lastIndex, lastType, lastPath, count }
-      let condition = { places, types, tags, name }
+      let condition = { places, types, tags, name, fileOnly }
 
       this.iterateTreeAsync(user, range, condition)
         .then(arr => callback(null, arr))
@@ -1288,6 +1288,9 @@ class VFS extends EventEmitter {
         tags: file.tags,
         metadata: file.metadata,
         place: index,
+        archived: file.archived,
+        bctime: file.bctime,
+        bmtime: file.bmtime,
         namepath 
       } 
 
@@ -1353,6 +1356,9 @@ class VFS extends EventEmitter {
           type: 'directory', 
           name: node.name, 
           mtime: Math.abs(node.mtime),
+          archived: file.archived,
+          bctime: file.bctime,
+          bmtime: file.bmtime,
         }
       } else if (node instanceof File) {
         if (tags) {
@@ -1373,7 +1379,10 @@ class VFS extends EventEmitter {
           mtime: node.mtime,
           hash: node.hash,
           tags: node.tags,
-          metadata: node.metadata
+          metadata: node.metadata,
+          archived: file.archived,
+          bctime: file.bctime,
+          bmtime: file.bmtime,
         } 
       } else { // string
         if (tags || types) return
