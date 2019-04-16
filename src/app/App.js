@@ -121,7 +121,7 @@ class App extends EventEmitter {
       config: this.cloudConf,
       boot: this.boot,
       device: this.device,
-      deviceSN: this.deviceSN
+      deviceSN: () => this.deviceSN
     }
 
     // create a Pipe
@@ -166,7 +166,7 @@ class App extends EventEmitter {
         this.cloudConf.cloudToken = message.data
         break
       case 'device': 
-        this.cloudConf.deviceSN = message.data.deviceSN
+        this.deviceSN = message.data.deviceSN
         break
       case 'boundUser':
         this.boot.setBoundUser(message.data)

@@ -294,7 +294,7 @@ class Pipe extends EventEmitter {
       resErr = error
     }
 
-    let uri = getURL(this.ctx.deviceSN, message.sessionId, false)
+    let uri = getURL(this.ctx.deviceSN(), message.sessionId, false)
     if (isFetch) uri += '/pipe/fetch'
     else if (isStore) uri += '/pipe/store'
     else uri += '/json'
@@ -337,7 +337,7 @@ class Pipe extends EventEmitter {
       console.log('required range stream: ', start, '  ', end)
     }
     request.post({
-      url: getURL(this.ctx.deviceSN, message.sessionId, false),
+      url: getURL(this.ctx.deviceSN(), message.sessionId, false),
       headers: {
         Authorization: this.ctx.config.cloudToken,
         'content-type': 'application/octet-stream',
@@ -357,7 +357,7 @@ class Pipe extends EventEmitter {
    */
   getResource (message) {
     return request({
-      uri: getURL(this.ctx.deviceSN, message.sessionId, false),
+      uri: getURL(this.ctx.deviceSN(), message.sessionId, false),
       method: 'GET',
       headers: {
         Authorization: this.ctx.config.cloudToken,
