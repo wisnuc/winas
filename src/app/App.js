@@ -76,10 +76,6 @@ class App extends EventEmitter {
 
     // create express
     this.secret = opts.secret || 'Lord, we need a secret'
-    //FIXME: where is deviceSN
-    try {
-      this.deviceSN = fs.readFileSync(Config.storage.files.sn).toString().trim()
-    } catch(e) {}
 
     // with cloudToken
     this.cloudConf = {

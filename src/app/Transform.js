@@ -313,7 +313,7 @@ class Pipe extends EventEmitter {
       }
     }, (error, response, body) => {
       if (error) return debug('reqCommand error: ', error)
-      debug('reqCommand success:',response.statusCode)
+      debug('reqCommand success:',response.statusCode, body)
     })
   }
   /**
@@ -348,7 +348,7 @@ class Pipe extends EventEmitter {
       if (error) {
         return debug(`postResource error: ${error}`)
       }
-      debug('reqCommand success:',response.statusCode)
+      debug('reqCommand success:',response.statusCode, body)
     })
   }
   /**

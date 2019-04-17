@@ -211,6 +211,7 @@ class VFS extends EventEmitter {
     try {
       rimraf.sync(dirPath)
       success = true
+      this.forest.deleteRoot(uuid)
     } catch (e) {
       console.log(e)
       success = false
