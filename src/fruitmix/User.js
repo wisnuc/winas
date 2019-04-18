@@ -117,8 +117,8 @@ class Reading extends Base {
   }
 
   updateUsers(data) {
-    if (data.owner.length) {
-      let owner = data.owner[0]
+    let owner = data.owner.find(x => !x.delete)
+    if (owner) {
       owner.isFirstUser = true
       // check owner
       let firstUser = this.user.users.find(u => u.isFirstUser)
@@ -134,7 +134,7 @@ class Reading extends Base {
           if (x) {
             x.avatarUrl = u.avatarUrl
             x.username = u.nickName || x.username
-            if (x.uuid !== owner.uuid) {
+            if (!x.isFirstUser) {
               x.cloud = !!u.cloud
               x.publicSpace = !!u.publicSpace
             }
