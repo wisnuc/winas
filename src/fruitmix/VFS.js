@@ -1381,9 +1381,9 @@ class VFS extends EventEmitter {
           hash: node.hash,
           tags: node.tags,
           metadata: node.metadata,
-          archived: file.archived,
-          bctime: file.bctime,
-          bmtime: file.bmtime,
+          archived: node.archived,
+          bctime: node.bctime,
+          bmtime: node.bmtime,
         } 
       } else { // string
         if (tags || types) return
