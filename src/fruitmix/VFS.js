@@ -1357,18 +1357,18 @@ class VFS extends EventEmitter {
           type: 'directory', 
           name: node.name, 
           mtime: Math.abs(node.mtime),
-          archived: file.archived,
-          bctime: file.bctime,
-          bmtime: file.bmtime,
+          archived: node.archived,
+          bctime: node.bctime,
+          bmtime: node.bmtime,
         }
       } else if (node instanceof File) {
         if (tags) {
-          if (!file.tags) return
-          if (!tags.every(tag => fle.tags.include(tag))) return
+          if (!node.tags) return
+          if (!tags.every(tag => node.tags.include(tag))) return
         }
         if (types) {
           if (!node.metadata) return 
-          if (!types.includes(file.metadata.type)) return
+          if (!types.includes(node.metadata.type)) return
         }
         if (name && !node.name.toLowerCase().includes(name.toLowerCase())) return
         xstat = { 
