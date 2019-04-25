@@ -1350,7 +1350,7 @@ class VFS extends EventEmitter {
       let xstat
       if (node instanceof Directory) {
         if (types || tags || fileOnly) return 
-        if (name && !node.name.includes(name)) return
+        if (name && !node.name.toLowerCase().includes(name.toLowerCase())) return
         xstat = { 
           uuid: node.uuid, 
           pdir: node.parent.uuid,
@@ -1370,7 +1370,7 @@ class VFS extends EventEmitter {
           if (!node.metadata) return 
           if (!types.includes(file.metadata.type)) return
         }
-        if (name && !node.name.includes(name)) return
+        if (name && !node.name.toLowerCase().includes(name.toLowerCase())) return
         xstat = { 
           uuid: node.uuid,
           pdir: node.parent.uuid,
@@ -1387,7 +1387,7 @@ class VFS extends EventEmitter {
         } 
       } else { // string
         if (tags || types) return
-        if (name && !node.includes(name)) return
+        if (name && !node.toLowerCase().includes(name.toLowerCase())) return
         xstat = {
           pdir: dir,
           type: 'file',
