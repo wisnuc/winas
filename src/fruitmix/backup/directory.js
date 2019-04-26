@@ -76,11 +76,12 @@ class Reading extends Directory.prototype.Reading {
   updateChildren (xstats) {
     // total
     this.dir.dirCount = xstats.filter(x => x.type === 'directory').length
-    this.dir.fileCount = xstats.filter(x => x.type === 'file').length
-    this.dir.fileSize = xstats.filter(x => x.type === 'file').reduce((acc, f) => acc + f.size, 0)
+    this.dir.fileCount = xstats.filter(x => x.type === 'file' && !x.fingerprint).length
+    this.dir.fileSize = xstats.filter(x => x.type === 'file' && !x.fingerprint).reduce((acc, f) => acc + f.size, 0)
 
     // keep all file names
-    // skip append mind file
+    // skip append intermediate file
+    // TODO: name <----> hash mapping
     this.dir.unindexedFiles = xstats
       .filter(x => x.type === 'file' && !x.metadata && !x.tags && !x.fingerprint )
       .map(x => x.bname || x.name)

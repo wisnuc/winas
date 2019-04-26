@@ -779,10 +779,9 @@ class VFS extends EventEmitter {
     this.DIR(user, props, (err, dir) => {
       if (err) return callback(err)
       let { name, hash } = props
+      // backup drive files use hash as filename
       let filename = this.isBackupDrive(props.driveUUID) ? hash : name
       if (!filename) return callback(Object.assign(new Error('filename not found'), { status: 404 }))
-      // console.log(dir, props)
-      // console.log(this.absolutePath(dir))
       let filePath = path.join(this.absolutePath(dir), filename)
       fs.lstat(filePath, (err, stat) => {
         if (err && (err.code === 'ENOENT' || err.code === 'ENOTDIR')) err.status = 404
@@ -1405,8 +1404,14 @@ class VFS extends EventEmitter {
           nodepath = dir.nodepath() 
           namepath = nodepath.slice(nodepath.indexOf(root) + 1).map(n => n.name)
           namepath.push(node)
+
+          // for backup dirs /translate unindexed filename -> hash(bashup drive use hash name)
+          // FIXME: backup unindexfilename -> file hash
+          if (this.backup.isBackupDir(dir)) {
+
+          }
         }
-        
+
         xstat.place = rootIndex
         xstat.namepath = namepath
 
@@ -1439,7 +1444,7 @@ class VFS extends EventEmitter {
     candidates.forEach((xstat, index) => {
       if (xstat.hasOwnProperty('uuid')) return 
       count++
-
+      // FIXME: backup files named file hash, use name while error
       let filePath = path.join(this.absolutePath(xstat.pdir), xstat.name)
       fs.lstat(filePath, (err, stat) => {
         if (err || !stat.isFile()) {

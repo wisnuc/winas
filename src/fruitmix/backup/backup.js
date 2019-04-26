@@ -7,12 +7,17 @@ const Promise = require('bluebird')
 const fileAttr = require('./file-attr')
 const { btrfsConcat } = require('../../lib/btrfs')
 const readdirAsync = Promise.promisify(require('./readdir'))
+const BDirectory = require('./directory')
 
 const EINVAL = (message) => Object.assign(new Error(message), { code: 'EINVAL' })
 
 class BACKUP {
   constructor(vfs) {
     this.vfs = vfs
+  }
+
+  isBackupDir(dir) {
+    return dir instanceof BDirectory
   }
 
   delete(user, props, callback) {
@@ -40,7 +45,7 @@ class BACKUP {
               done()
           })
         } else {
-          return callback(new Error('delete file must fileUUID && hash'))
+          return callback(new Error('deleting file must provide fileUUID && hash'))
         }
       } else {
         // if top dir, force delete without deleted stub
